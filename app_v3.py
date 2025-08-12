@@ -1602,7 +1602,7 @@ def start_telegram_bot_thread():
 # -------------------- Sample data & init --------------------
 def create_sample_data():
     if User.query.count() == 0:
-        admin = User(username='admin', role='admin'); admin.set_password('admin')
+        admin = User(username='admin', role='admin'); admin.set_password('admin123')
         trener = User(username='trener', role='trainer'); trener.set_password('trainer')
         db.session.add_all([admin, trener]); db.session.commit(); logger.info('Sample users created')
     # create common teams if missing
@@ -1740,60 +1740,6 @@ def pay_payment():
 
     return jsonify({"ok": True})
 
-
-
-    # --- Присъствие по месеци ---
-    attendance_stats = db.session.query(
-        Training.month,
-        Training.year,
-        db.func.avg(Attendance.status == 'present').label("attendance_percent")
-    ).join(Attendance, Attendance.training_id == Training.id) \
-     .group_by(Training.year, Training.month) \
-     .order_by(Training.year, Training.month).all()
-
-    attendance_labels = [f"{row.month:02d}/{row.year}" for row in attendance_stats]
-    attendance_percent = [round(row.attendance_percent * 100, 2) if row.attendance_percent else 0 for row in attendance_stats]
-
-    return render_template(
-        'stats.html',
-        payments_labels=payments_labels or [],
-        payments_paid=payments_paid or [],
-        payments_unpaid=payments_unpaid or [],
-        attendance_labels=attendance_labels or [],
-        attendance_percent=attendance_percent or []
-    )
-
-
-    # --- Присъствия на играчите ---
-    attendance_stats = db.session.query(
-        Player.full_name,
-        db.func.count(TrainingAttendance.id).label("total"),
-        db.func.sum(db.case((TrainingAttendance.status == 'present', 1), else_=0)).label("present")
-    ).join(TrainingAttendance.player).group_by(Player.id).all()
-
-    attendance_stats_list = []
-    for a in attendance_stats:
-        percent = round((a.present / a.total) * 100, 1) if a.total else 0
-        attendance_stats_list.append({
-            "full_name": a.full_name,
-            "present": a.present,
-            "total": a.total,
-            "percent": percent
-        })
-
-    attendance_labels = [row['full_name'] for row in attendance_stats_list]
-    attendance_percent = [row['percent'] for row in attendance_stats_list]
-
-    return render_template(
-        "stats.html",
-        payments_stats=payments_stats_list,
-        attendance_stats=attendance_stats_list,
-        payments_labels=payments_labels,
-        payments_paid=payments_paid,
-        payments_unpaid=payments_unpaid,
-        attendance_labels=attendance_labels,
-        attendance_percent=attendance_percent
-    )
 
 
 # -------------------- Run --------------------
