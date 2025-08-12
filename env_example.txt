@@ -18,3 +18,4 @@ SMTP_PASS=your-app-password
 
 # Railway (автоматично се задава)
 # RENDER_EXTERNAL_HOSTNAME=your-app.railway.app
+

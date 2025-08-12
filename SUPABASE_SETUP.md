@@ -78,3 +78,4 @@ postgresql://postgres:your-password@db.abcdefghijklmnop.supabase.co:5432/postgre
 ---
 
 **С Supabase имате професионална PostgreSQL база данни безплатно! 🎉**
+
