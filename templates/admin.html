@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Админ</h3>
+<div class="mb-3"><a class="btn btn-primary" href="{{ url_for('create_user') }}">Добави потребител</a></div>
+<div class="card mb-3"><div class="card-body">
+<h5>Импорт на състезатели (.csv)</h5>
+<form method="post" action="{{ url_for('admin_import') }}" enctype="multipart/form-data">
+  <input type="file" name="file" accept=".csv" required class="form-control mb-2">
+  <button class="btn btn-success">Качи и импортирай</button>
+</form>
+<small>Колони: Състезател,Отбор,Дата на раждане,Телефон на състезател,Телефон на родителя,Имейл</small>
+</div></div>
+<table class="table"><thead><tr><th>Потребител</th><th>Роля</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u.username }}</td><td>{{ u.role }}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

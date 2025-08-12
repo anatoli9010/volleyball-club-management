@@ -1,0 +1,24 @@
+{% extends 'base.html' %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Отбори</h3>
+  {% if current_user.role=='admin' %}<a class="btn btn-success" href="{{ url_for('add_team') }}">➕ Добави</a>{% endif %}
+</div>
+<table class="table">
+  <thead><tr><th>Име</th><th>Възраст</th><th>Пол</th><th>Играч(и)</th><th></th></tr></thead>
+  <tbody>
+    {% for t in teams %}
+    <tr>
+      <td>{{ t.name }}</td><td>{{ t.age_group or '-' }}</td><td>{{ t.gender or '-' }}</td><td>{{ t.players|length }}</td>
+      <td>
+        {% if current_user.role=='admin' %}
+          <a class="btn btn-sm btn-primary" href="{{ url_for('edit_team', team_id=t.id) }}">✏</a>
+          <form method="post" action="{{ url_for('delete_team', team_id=t.id) }}" style="display:inline" onsubmit="return confirm('Сигурни ли сте?')">
+            <button class="btn btn-sm btn-danger">Изтрий</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

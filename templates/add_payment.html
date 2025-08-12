@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Добавяне на плащане</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="player_id" class="form-label">Избери играч</label>
+            <select class="form-select" id="player_id" name="player_id" required>
+                {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="amount" class="form-label">Сума</label>
+            <input type="number" class="form-control" id="amount" name="amount" step="0.01" required>
+        </div>
+        <div class="mb-3">
+            <label for="payment_date" class="form-label">Дата</label>
+            <input type="date" class="form-control" id="payment_date" name="payment_date" required>
+        </div>
+        <button type="submit" class="btn btn-success">💾 Запази</button>
+        <a href="{{ url_for('payments_list') }}" class="btn btn-secondary">⬅ Назад</a>
+    </form>
+</div>
+{% endblock %}

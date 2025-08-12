@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% block content %}
+<h3>{{ 'Редактирай' if player else 'Нов състезател' }}</h3>
+<form method="post" class="row g-2">
+  <div class="col-12"><label>Име</label><input name="full_name" class="form-control" value="{{ player.full_name if player else '' }}" required></div>
+  <div class="col-6"><label>Дата ражд.</label><input name="birth_date" type="date" class="form-control" value="{{ player.birth_date if player and player.birth_date else '' }}"></div>
+  <div class="col-6"><label>Отбор</label><select name="team_id" class="form-select"><option value=''>-- без отбор --</option>{% for t in teams %}<option value='{{ t.id }}' {% if player and player.team_id==t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+  <div class="col-6"><label>Тел. съст.</label><input name="player_phone" class="form-control" value="{{ player.player_phone if player else '' }}"></div>
+  <div class="col-6"><label>Тел. родител</label><input name="parent_phone" class="form-control" value="{{ player.parent_phone if player else '' }}"></div>
+  <div class="col-6"><label>Email</label><input name="email" class="form-control" value="{{ player.email if player else '' }}"></div>
+  <div class="col-6"><label>Telegram ID</label><input name="parent_telegram_id" class="form-control" value="{{ player.parent_telegram_id if player else '' }}"></div>
+  <div class="col-12"><label>Бележки</label><textarea name="notes" class="form-control">{{ player.notes if player else '' }}</textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Запази</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <h2 class="mb-2">💳 Плащания</h2>
+        <div class="d-flex flex-wrap gap-2">
+            <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="🔍 Търси по име...">
+            <a href="{{ url_for('remind_all_payments') }}" class="btn btn-warning btn-sm">
+                🔔 Напомни на всички
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle" id="paymentsTable">
+            <thead class="table-dark">
+                <tr>
+                    <th>Име</th>
+                    <th>Статус</th>
+                    <th>Сума</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                <tr>
+                    <td>{{ row.player.full_name }}</td>
+                    <td>
+                        {% if row.payment.status == 'paid' %}
+                            <span class="badge bg-success">Платено</span>
+                        {% else %}
+                            <span class="badge bg-danger">Неплатено</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ row.payment.amount or 0 }} лв.</td>
+                    <td>
+                        <!-- Отбелязване като платено -->
+                        <button class="btn btn-success btn-sm" onclick="openPayModal({{ row.player.id }})">💲 Плати</button>
+
+                        <!-- История -->
+                        <button class="btn btn-info btn-sm" onclick="openHistoryModal({{ row.player.id }})">📜 История</button>
+
+                        <!-- Напомняне -->
+                        <a href="{{ url_for('remind_payment', payment_id=row.payment.id) }}" 
+                           class="btn btn-warning btn-sm">🔔 Напомни</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модал за плащане -->
+<div class="modal fade" id="payModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('add_payment') }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Отбелязване на плащане</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="player_id" id="pay_player_id">
+          <div class="mb-3">
+            <label>Месец</label>
+            <input type="number" name="month" class="form-control" min="1" max="12" required>
+          </div>
+          <div class="mb-3">
+            <label>Година</label>
+            <input type="number" name="year" class="form-control" min="2000" required>
+          </div>
+          <div class="mb-3">
+            <label>Сума</label>
+            <input type="number" step="0.01" name="amount" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary">Запиши</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Модал за история -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">История на плащанията</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Месец</th>
+              <th>Година</th>
+              <th>Сума</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openPayModal(playerId) {
+    document.getElementById('pay_player_id').value = playerId;
+    new bootstrap.Modal(document.getElementById('payModal')).show();
+}
+
+function openHistoryModal(playerId) {
+    fetch(`/api/player/${playerId}/payments`)
+    .then(res => res.json())
+    .then(data => {
+        let tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+        data.forEach(row => {
+            tbody.innerHTML += `<tr>
+                <td>${row.month}</td>
+                <td>${row.year}</td>
+                <td>${row.amount} лв.</td>
+                <td>${row.paid ? '✅ Платено' : '❌ Неплатено'}</td>
+            </tr>`;
+        });
+        new bootstrap.Modal(document.getElementById('historyModal')).show();
+    });
+}
+
+document.getElementById('searchInput').addEventListener('keyup', function () {
+    let value = this.value.toLowerCase();
+    document.querySelectorAll("#paymentsTable tbody tr").forEach(function (row) {
+        row.style.display = row.innerText.toLowerCase().includes(value) ? "" : "none";
+    });
+});
+</script>
+{% endblock %}

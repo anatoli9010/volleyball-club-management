@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <!-- Статистика за плащания -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                <h5 class="mb-2 mb-md-0">💰 Статистика за плащания</h5>
+                <form method="get" action="{{ url_for('export_stats_payments') }}" class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <input type="month" name="start" class="form-control form-control-sm" placeholder="От месец">
+                    </div>
+                    <div class="col-auto">
+                        <input type="month" name="end" class="form-control form-control-sm" placeholder="До месец">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-light btn-sm">📥 Свали CSV</button>
+<a href="{{ url_for('export_stats_payments_excel_v2') }}" class="btn btn-warning btn-sm ms-2">📊 Свали Excel</a>
+
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="card-body">
+            <canvas id="paymentsChart" style="max-height: 300px;"></canvas>
+        </div>
+    </div>
+
+    <!-- Статистика за присъствия -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                <h5 class="mb-2 mb-md-0">📅 Статистика за присъствия</h5>
+                <form method="get" action="{{ url_for('export_stats_attendance') }}" class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <input type="month" name="start" class="form-control form-control-sm" placeholder="От месец">
+                    </div>
+                    <div class="col-auto">
+                        <input type="month" name="end" class="form-control form-control-sm" placeholder="До месец">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-light btn-sm">📥 Свали</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="card-body">
+            <canvas id="attendanceChart" style="max-height: 300px;"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Плащания диаграма
+    new Chart(document.getElementById('paymentsChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ payments_labels|tojson }},
+            datasets: [
+                {
+                    label: 'Платени',
+                    data: {{ payments_paid|tojson }},
+                    backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Неплатени',
+                    data: {{ payments_unpaid|tojson }},
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+
+    // Присъствия диаграма
+    new Chart(document.getElementById('attendanceChart'), {
+        type: 'line',
+        data: {
+            labels: {{ attendance_labels|tojson }},
+            datasets: [
+                {
+                    label: 'Средно присъствие (%)',
+                    data: {{ attendance_percent|tojson }},
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: 'rgba(0, 123, 255, 1)',
+                    pointRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top' } },
+            scales: { y: { beginAtZero: true, max: 100 } }
+        }
+    });
+</script>
+{% endblock %}

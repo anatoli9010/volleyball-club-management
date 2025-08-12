@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-calendar-plus text-primary"></i> Добавяне на тренировка</h2>
+<form method="post" class="card shadow-sm p-3 border-0">
+  <div class="mb-3">
+    <label class="form-label"><i class="bi bi-people-fill"></i> Отбор</label>
+    <select name="team_id" class="form-select" required>
+      {% for team in teams %}
+      <option value="{{ team.id }}">{{ team.name }} ({{ team.age_group }} {{ team.gender }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label"><i class="bi bi-calendar-event"></i> Дата</label>
+    <input type="date" name="date" class="form-control" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label"><i class="bi bi-pencil-square"></i> Бележки</label>
+    <textarea name="notes" class="form-control" rows="3" placeholder="Допълнителна информация..."></textarea>
+  </div>
+  <div class="d-grid">
+    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-save"></i> Запази</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Добави/Редактирай тренировка</h3>
+<form method="post" class="row g-2">
+  <div class="col-6"><label>Дата</label><input name="date" type="date" class="form-control" required value="{{ training.date if training else '' }}"></div>
+  <div class="col-6"><label>Отбор</label><select name="team_id" class="form-select">{% for t in teams %}<option value="{{ t.id }}" {% if training and training.team_id==t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+  <div class="col-6"><label>Начален час</label><input name="start_time" class="form-control" placeholder="18:00" value="{{ training.start_time if training else '' }}"></div>
+  <div class="col-6"><label>Краен час</label><input name="end_time" class="form-control" placeholder="19:30" value="{{ training.end_time if training else '' }}"></div>
+  <div class="col-12"><label>Бележки</label><textarea name="notes" class="form-control">{{ training.notes if training else '' }}</textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Запази</button></div>
+</form>
+{% endblock %}

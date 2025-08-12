@@ -1,0 +1,21 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Присъствие за {{ training.date.strftime('%d.%m.%Y') }} — {{ training.session_team.name if training.session_team else '' }}</h3>
+<form method="post">
+  <table class="table">
+    <thead><tr><th>Играч</th><th>Присъства</th></tr></thead>
+    <tbody>
+      {% for p in players %}
+      <tr>
+        <td>{{ p.full_name }}</td>
+        <td><input type="checkbox" name="present_{{ p.id }}" {% if attendance_map.get(p.id) == 'present' %}checked{% endif %}></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="mb-3"><label>Бележка до родител (по избор)</label><input name="note" class="form-control"></div>
+  <div class="mb-3">
+    <button class="btn btn-primary">Запази присъствие</button>
+    <button type="submit" name="notify" value="1" class="btn btn-warning">Запази и Изпрати уведомления</button>
+  </div>
+</form>
+{% endblock %}

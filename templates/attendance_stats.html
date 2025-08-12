@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Статистика присъствия</h3>
+<h5>Играч: {{ player.full_name }}</h5>
+<p>Общо тренировки: {{ total }}, Присъствия: {{ present }}, Процент: {{ percent }}%</p>
+<hr>
+<h5>Отбор: {{ team.name if team else '-' }}</h5>
+<table class="table">
+  <thead><tr><th>Играч</th><th>Общо</th><th>Присъства</th><th>%</th></tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr><td>{{ r.full_name }}</td><td>{{ r.total }}</td><td>{{ r.present }}</td><td>{{ r.percent }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

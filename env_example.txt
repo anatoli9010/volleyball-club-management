@@ -1,0 +1,20 @@
+# Railway + Supabase Configuration
+# Копирайте този файл като .env и попълнете вашите стойности
+
+# Database (Supabase)
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+
+# Flask
+SECRET_KEY=your-super-secret-key-here
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+
+# Email (Gmail)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# Railway (автоматично се задава)
+# RENDER_EXTERNAL_HOSTNAME=your-app.railway.app
