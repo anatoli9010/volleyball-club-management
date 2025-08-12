@@ -51,7 +51,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret')
 # Database configuration - PostgreSQL for production, SQLite for development
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    # Production - PostgreSQL (Railway, Supabase, etc.)
+    # Production - PostgreSQL (Render, Railway, Supabase, etc.)
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
