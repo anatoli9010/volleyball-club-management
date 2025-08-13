@@ -57,7 +57,7 @@ if DATABASE_URL:
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 else:
     # Development - SQLite
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_FOLDER)
@@ -2145,3 +2145,69 @@ def manage_recurring_slots():
         return redirect(url_for('manage_recurring_slots'))
     slots = RecurringSlot.query.order_by(RecurringSlot.weekday, RecurringSlot.start_time).all()
     return render_template('slots.html', seasons=seasons, teams=teams, slots=slots)
+
+@app.route('/admin/seed_summer_2024_2025', methods=['POST'])
+@role_required('admin')
+def seed_summer_season():
+    # Create or get season
+    name = 'ЛЕТЕН 2024/2025'
+    season = Season.query.filter_by(name=name).first()
+    if not season:
+        season = Season(name=name, is_active=True)
+        # deactivate others
+        Season.query.update({Season.is_active: False})
+        db.session.add(season)
+        db.session.commit()
+    else:
+        # set active
+        Season.query.update({Season.is_active: False})
+        season.is_active = True
+        db.session.commit()
+
+    def team_by_name(n):
+        return Team.query.filter_by(name=n).first()
+
+    slots = []
+    # Helper to append slot
+    def add_slot(weekday, start_time, end_time, venue, title, team_name=None):
+        team_id = team_by_name(team_name).id if team_name and team_by_name(team_name) else None
+        slots.append(RecurringSlot(season_id=season.id, team_id=team_id, weekday=weekday,
+                                   start_time=start_time, end_time=end_time, venue=venue, title=title))
+
+    # Monday (0)
+    add_slot(0, '08:00', '09:00', 'СТАДИОН', 'Момичета до 12г')
+    add_slot(0, '08:00', '09:00', 'СТАДИОН', 'Момичета до 12г')  # duplicated per sheet
+    add_slot(0, '10:00', '11:30', 'ЧАВДАР', 'Момичета 2009/10/11/12')
+    add_slot(0, '16:00', '17:30', 'НУПИ', 'Момичета до 12г')
+    add_slot(0, '17:30', '19:00', 'НУПИ', 'Момичета до 12г')
+    add_slot(0, '19:30', '21:15', 'ЧАВДАР', 'Старша')
+
+    # Tuesday (1)
+    add_slot(1, '10:00', '11:30', 'ЧАВДАР', 'Момичета 2009/10/11/12')
+    add_slot(1, '11:00', '12:30', 'ЧАВДАР', 'Момчета 2009/10/11/12')
+
+    # Wednesday (2)
+    add_slot(2, '08:00', '09:00', 'СТАДИОН', 'Момичета до 12г')
+    add_slot(2, '10:00', '11:30', 'ЧАВДАР', 'Момичета 2009/10/11/12')
+    add_slot(2, '16:00', '17:30', 'НУПИ', 'Момичета до 12г')
+    add_slot(2, '17:30', '19:00', 'НУПИ', 'Момичета до 12г')
+    add_slot(2, '19:30', '21:30', 'ЧАВДАР', 'Старша+Мъже')
+
+    # Thursday (3)
+    add_slot(3, '08:00', '09:00', 'СТАДИОН', 'Момичета 2009/10/11/12')
+    add_slot(3, '10:00', '11:30', 'НУПИ', 'Момичета до 12г')
+    add_slot(3, '11:30', '13:00', 'НУПИ', 'Момичета до 12г')
+
+    # Friday (4)
+    add_slot(4, '08:30', '10:00', 'НУПИ', 'Момичета 2009/10/11/12')
+    add_slot(4, '10:00', '12:00', 'НУПИ', 'Момичета до 12г')
+
+    # Saturday (5)
+    add_slot(5, '19:30', '21:15', 'ЧАВДАР', 'Старша')
+
+    # Save (clear previous slots of the season)
+    RecurringSlot.query.filter_by(season_id=season.id).delete()
+    db.session.add_all(slots)
+    db.session.commit()
+    flash('Летният график е въведен и сезонът е активен.','success')
+    return redirect(url_for('manage_recurring_slots'))
