@@ -45,7 +45,7 @@
     {% for s in slots %}
     <tr>
       <td>{{ s.season_id }}</td>
-      <td>{{ s.team.name if s.team_id else '-' }}</td>
+      <td>{{ (Team.query.get(s.team_id).name if s.team_id and Team.query.get(s.team_id) else '-') }}</td>
       <td>{{ ['Пон','Вто','Сря','Чет','Пет','Съб','Нед'][s.weekday] }}</td>
       <td>{{ s.start_time }}–{{ s.end_time }}</td>
       <td>{{ s.venue or '-' }}</td>
