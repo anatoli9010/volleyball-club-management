@@ -751,6 +751,74 @@ def notify_attendance_change(player, training, status, note=None):
     # send only telegram for attendance notifications
     send_telegram(player.parent_telegram_id, message)
 
+# -------------------- Broadcast messages (Telegram) --------------------
+@app.route('/broadcast', methods=['GET', 'POST'])
+@login_required
+def broadcast():
+    # Достъп: треньор или админ
+    if getattr(current_user, 'role', None) not in ('trainer', 'admin'):
+        abort(403)
+
+    all_teams = Team.query.order_by(Team.name).all()
+
+    # Шаблони по подразбиране; могат да се редактират в текстовото поле
+    templates = [
+        {
+            "key": "cancel",
+            "label": "Тренировката се отменя",
+            "text": "Внимание: Тренировката днес се отменя. Извиняваме се за неудобството."
+        },
+        {
+            "key": "travel",
+            "label": "Напомняне за пътуване",
+            "text": (
+                "Напомняне: Отборът утре пътува.\n"
+                "Чакаме се в двора на училище Кирил и Методий.\n"
+                "Час на тръгване: __:__\n"
+                "Пътуваме за: __________\n"
+                "Пътуваме с: автобус/родители\n"
+                "Моля, потвърдете присъствие."
+            )
+        },
+        {
+            "key": "custom",
+            "label": "Свободен текст",
+            "text": ""
+        }
+    ]
+
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('team_ids')
+        message_text = (request.form.get('message_text') or '').strip()
+
+        if not selected_ids:
+            flash('Моля, изберете поне един отбор.', 'error')
+            return render_template('broadcast.html', teams=all_teams, templates=templates)
+        if not message_text:
+            flash('Моля, въведете текст на съобщението.', 'error')
+            return render_template('broadcast.html', teams=all_teams, templates=templates)
+
+        try:
+            team_ids = [int(tid) for tid in selected_ids]
+        except Exception:
+            team_ids = []
+
+        # Събиране на уникални telegram chat_id на родители от избраните отбори
+        players = Player.query.filter(Player.team_id.in_(team_ids)).all()
+        chat_ids = {p.parent_telegram_id for p in players if p.parent_telegram_id}
+
+        sent = 0
+        for chat_id in chat_ids:
+            ok = send_telegram(chat_id, message_text)
+            if ok is None or ok is True:
+                sent += 1
+
+        skipped = len(players) - len(chat_ids)
+        flash(f'Изпратени съобщения: {sent}. Пропуснати без Telegram: {skipped}.', 'success')
+        return redirect(url_for('broadcast'))
+
+    return render_template('broadcast.html', teams=all_teams, templates=templates)
+
 # -------------------- Routes --------------------
 @app.route('/')
 @login_required

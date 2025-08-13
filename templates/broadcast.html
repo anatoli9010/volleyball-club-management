@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h3 class="me-2">Изпрати събитие/промяна</h3>
+  <span class="text-muted">(Telegram към родители на избрани отбори)</span>
+  <div class="ms-auto">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('calendar_view') }}">Календар</a>
+  </div>
+  
+</div>
+
+<form method="post">
+  <div class="row g-3">
+    <div class="col-12 col-md-6">
+      <label class="form-label">Отбори</label>
+      <select class="form-select" name="team_ids" multiple size="8" required>
+        {% for t in teams %}
+          <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Задръжте Ctrl/Cmd за избор на повече отбори.</div>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label">Шаблон</label>
+      <select id="tplSelect" class="form-select">
+        {% for tpl in templates %}
+          <option value="{{ loop.index0 }}">{{ tpl.label }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Изберете шаблон и редактирайте текста по-долу при нужда.</div>
+
+      <label class="form-label mt-3">Текст на съобщението</label>
+      <textarea id="msgText" name="message_text" class="form-control" rows="10" required>{{ templates[0].text }}</textarea>
+
+      <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-primary">Изпрати</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('broadcast') }}">Изчисти</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+  const templates = {{ templates|tojson }};
+  const select = document.getElementById('tplSelect');
+  const ta = document.getElementById('msgText');
+  if (select && ta) {
+    select.addEventListener('change', () => {
+      const idx = parseInt(select.value, 10);
+      const tpl = templates[idx] || {text: ''};
+      ta.value = tpl.text || '';
+      ta.focus();
+    });
+  }
+</script>
+{% endblock %}
+
+
