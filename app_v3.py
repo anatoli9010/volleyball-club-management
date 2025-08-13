@@ -304,20 +304,56 @@ class RecurringSlot(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Цветова схема за имена на отбори (ползва се в шаблони и календар)
-def team_color_for_name(name: str) -> str:
-    n = (name or '').lower()
-    if 'u-12' in n or ('момичета' in n and '12' in n and 'м' not in n):
-        return '#dc3545'  # червено U-12 Ж
-    if 'u-12 m' in n or ('u-12' in n and 'm' in n) or ('момчета' in n and '12' in n):
-        return '#0d6efd'  # синьо U-12 М
-    if 'момичета' in n and any(x in n for x in ['2009','2010','2011','2012','18']):
-        return '#d63384'  # магента U-18 Ж
-    if 'момчета' in n or 'мъже' in n:
-        return '#198754'  # зелено U-18 М / мъже
+# Цветова схема и нормализация на имената на отбори (консистентна навсякъде)
+TEAM_COLORS = {
+    'U-12 Ж': '#dc3545',  # червено
+    'U-12 М': '#0d6efd',  # синьо
+    'U-18 Ж': '#d63384',  # магента/розово
+    'U-18 М': '#198754',  # зелено
+    'Старша': '#6f42c1',  # лилаво (ако се ползва)
+}
+
+def _normalize_team_label(raw: str) -> str:
+    """Мапва различни варианти към точните етикети от графика."""
+    if not raw:
+        return ''
+    n = (raw or '').strip().lower()
+    # ключови нормализации по кирилица/латиница
+    repl = (
+        ('u12', 'u-12'),
+        ('u 12', 'u-12'),
+        ('u18', 'u-18'),
+        ('u 18', 'u-18'),
+        ('girls', 'ж'),
+        ('girls', 'ж'),
+        ('boys', 'м'),
+        ('момичета', 'ж'),
+        ('момчета', 'м'),
+        ('мъже', 'м'),
+    )
+    for a, b in repl:
+        n = n.replace(a, b)
+    n = n.replace('  ', ' ')
+    # точни разпознавания
+    if 'u-12' in n and 'ж' in n:
+        return 'U-12 Ж'
+    if 'u-12' in n and 'м' in n:
+        return 'U-12 М'
+    if 'u-18' in n and 'ж' in n:
+        return 'U-18 Ж'
+    if 'u-18' in n and 'м' in n:
+        return 'U-18 М'
     if 'старша' in n:
-        return '#6f42c1'  # лилаво
-    return '#0d6efd'
+        return 'Старша'
+    # вече може да е точно име
+    cap = raw.strip()
+    if cap in TEAM_COLORS:
+        return cap
+    return cap
+
+def team_color_for_name(name: str) -> str:
+    key = _normalize_team_label(name)
+    return TEAM_COLORS.get(key, '#0d6efd')
 
 # направи модела Team достъпен в Jinja шаблоните като 'Team' и функцията team_color
 @app.context_processor
@@ -2091,19 +2127,9 @@ def api_calendar_events():
             return 'СТАДИОН'
         return ''
 
+    # използваме централизираната цветова функция
     def team_color_for(name: str) -> str:
-        # Цветове по отбор (приближени към снимката)
-        n = (name or '').lower()
-        if 'момичета' in n and '12' in n:
-            return '#dc3545'  # червено U-12 Ж
-        if 'момичета' in n and any(x in n for x in ['2009', '2010', '2011', '2012', '18']):
-            return '#d63384'  # магента U-18 Ж групи
-        if 'момчета' in n:
-            return '#198754'  # зелено U-18 М
-        if 'старша' in n:
-            return '#6f42c1'  # лилаво
-        # fallback за други екипи
-        return '#0d6efd'      # синьо
+        return team_color_for_name(name)
 
     events = []
     for s in sessions:
@@ -2213,41 +2239,53 @@ def seed_summer_season():
 
     slots = []
     # Helper to append slot
-    def add_slot(weekday, start_time, end_time, venue, title, team_name=None):
-        team_id = team_by_name(team_name).id if team_name and team_by_name(team_name) else None
-        slots.append(RecurringSlot(season_id=season.id, team_id=team_id, weekday=weekday,
-                                   start_time=start_time, end_time=end_time, venue=venue, title=title))
+    def add_slot(weekday, start_time, end_time, venue, team_label):
+        # Нормализирани етикети според графика
+        name = _normalize_team_label(team_label)
+        t = team_by_name(name)
+        team_id = t.id if t else None
+        slots.append(RecurringSlot(
+            season_id=season.id,
+            team_id=team_id,
+            weekday=weekday,
+            start_time=start_time,
+            end_time=end_time,
+            venue=venue,
+            title=name
+        ))
 
-    # Monday (0)
-    add_slot(0, '08:00', '09:00', 'СТАДИОН', 'Момичета до 12г')
-    add_slot(0, '08:00', '09:00', 'СТАДИОН', 'Момичета до 12г')  # duplicated per sheet
-    add_slot(0, '10:00', '11:30', 'ЧАВДАР', 'Момичета 2009/10/11/12')
-    add_slot(0, '16:00', '17:30', 'НУПИ', 'Момичета до 12г')
-    add_slot(0, '17:30', '19:00', 'НУПИ', 'Момичета до 12г')
-    add_slot(0, '19:30', '21:15', 'ЧАВДАР', 'Старша')
+    # Понеделник (0)
+    add_slot(0, '08:00', '09:00', 'СТАДИОН', 'U-12 Ж')
+    add_slot(0, '08:00', '09:00', 'СТАДИОН', 'U-12 М')
+    add_slot(0, '10:00', '11:30', 'ЧАВДАР', 'U-18 Ж')
+    add_slot(0, '16:00', '17:30', 'НУПИ', 'U-12 Ж')
+    add_slot(0, '17:30', '19:00', 'НУПИ', 'U-12 М')
+    add_slot(0, '19:30', '21:15', 'ЧАВДАР', 'U-18 М')
 
-    # Tuesday (1)
-    add_slot(1, '10:00', '11:30', 'ЧАВДАР', 'Момичета 2009/10/11/12')
-    add_slot(1, '11:00', '12:30', 'ЧАВДАР', 'Момчета 2009/10/11/12')
+    # Вторник (1)
+    add_slot(1, '10:00', '11:30', 'ЧАВДАР', 'U-18 Ж')
+    add_slot(1, '11:00', '12:30', 'ЧАВДАР', 'U-18 М')
 
-    # Wednesday (2)
-    add_slot(2, '08:00', '09:00', 'СТАДИОН', 'Момичета до 12г')
-    add_slot(2, '10:00', '11:30', 'ЧАВДАР', 'Момичета 2009/10/11/12')
-    add_slot(2, '16:00', '17:30', 'НУПИ', 'Момичета до 12г')
-    add_slot(2, '17:30', '19:00', 'НУПИ', 'Момичета до 12г')
-    add_slot(2, '19:30', '21:30', 'ЧАВДАР', 'Старша+Мъже')
+    # Сряда (2)
+    add_slot(2, '08:00', '09:00', 'СТАДИОН', 'U-12 Ж')
+    add_slot(2, '08:00', '09:00', 'СТАДИОН', 'U-12 М')
+    add_slot(2, '10:00', '11:30', 'ЧАВДАР', 'U-18 Ж')
+    add_slot(2, '16:00', '17:30', 'НУПИ', 'U-12 Ж')
+    add_slot(2, '17:30', '19:00', 'НУПИ', 'U-12 М')
+    add_slot(2, '19:30', '21:30', 'ЧАВДАР', 'U-18 М')
 
-    # Thursday (3)
-    add_slot(3, '08:00', '09:00', 'СТАДИОН', 'Момичета 2009/10/11/12')
-    add_slot(3, '10:00', '11:30', 'НУПИ', 'Момичета до 12г')
-    add_slot(3, '11:30', '13:00', 'НУПИ', 'Момичета до 12г')
+    # Четвъртък (3)
+    add_slot(3, '08:00', '09:00', 'СТАДИОН', 'U-18 М')
+    add_slot(3, '10:00', '11:30', 'НУПИ', 'U-12 Ж')
+    add_slot(3, '11:30', '13:00', 'НУПИ', 'U-12 Ж')
 
-    # Friday (4)
-    add_slot(4, '08:30', '10:00', 'НУПИ', 'Момичета 2009/10/11/12')
-    add_slot(4, '10:00', '12:00', 'НУПИ', 'Момичета до 12г')
+    # Петък (4)
+    add_slot(4, '08:30', '10:00', 'НУПИ', 'U-18 Ж')
+    add_slot(4, '10:00', '11:30', 'НУПИ', 'U-12 М')
+    add_slot(4, '10:00', '12:00', 'НУПИ', 'U-12 М')
 
-    # Saturday (5)
-    add_slot(5, '19:30', '21:15', 'ЧАВДАР', 'Старша')
+    # Събота (5)
+    add_slot(5, '19:30', '21:15', 'ЧАВДАР', 'U-18 М')
 
     # Save (clear previous slots of the season)
     RecurringSlot.query.filter_by(season_id=season.id).delete()
