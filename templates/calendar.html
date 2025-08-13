@@ -50,8 +50,8 @@
           const data = await resp.json();
 
           const events = data.map(ev => {
-            // color by venue
-            let color = venueColors[ev.venue?.toUpperCase?.() || ''] || '#6c757d';
+            // color by team (primary), fallback by venue
+            let color = ev.team_color || venueColors[ev.venue?.toUpperCase?.() || ''] || '#6c757d';
             return {
               id: ev.id,
               title: ev.title,
@@ -59,6 +59,7 @@
               end: ev.end,
               backgroundColor: color,
               borderColor: color,
+              textColor: '#111',
               extendedProps: { editUrl: ev.edit_url }
             };
           });

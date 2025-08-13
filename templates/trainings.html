@@ -1,10 +1,17 @@
 {% extends 'base.html' %}{% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>Тренировки</h3>
-  <a class="btn btn-success" href="{{ url_for('add_training') }}">➕ Добави тренировка</a>
+  <div class="btn-group">
+    <a class="btn btn-success" href="{{ url_for('add_training') }}">➕ Добави тренировка</a>
+    {% if current_user.role == 'admin' %}
+      <form method="post" action="{{ url_for('delete_all_trainings') }}" onsubmit="return confirm('Наистина ли да изтрием всички тренировки?');">
+        <button class="btn btn-outline-danger">🗑️ Изтрий всички</button>
+      </form>
+    {% endif %}
+  </div>
 </div>
 <table class="table">
-  <thead><tr><th>Дата</th><th>Отбор</th><th>Час</th><th>Бележки</th><th>Присъствие</th></tr></thead>
+  <thead><tr><th>Дата</th><th>Отбор</th><th>Час</th><th>Бележки</th><th>Присъствие</th><th></th></tr></thead>
   <tbody>
     {% for tr in trainings %}
     <tr>
@@ -12,7 +19,14 @@
       <td>{{ tr.session_team.name if tr.session_team else '—' }}</td>
       <td>{{ tr.start_time or '-' }} - {{ tr.end_time or '-' }}</td>
       <td>{{ tr.notes or '' }}</td>
-      <td><a class="btn btn-sm btn-primary" href="{{ url_for('attendance_form', training_id=tr.id) }}">Отбележи</a></td>
+      <td>
+        <a class="btn btn-sm btn-primary" href="{{ url_for('attendance_form', training_id=tr.id) }}">Отбележи</a>
+      </td>
+      <td class="text-end">
+        <form method="post" action="{{ url_for('delete_training', training_id=tr.id) }}" onsubmit="return confirm('Изтриване на тренировката?');" style="display:inline">
+          <button class="btn btn-sm btn-outline-danger">Изтрий</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </tbody>

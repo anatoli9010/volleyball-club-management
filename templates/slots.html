@@ -40,16 +40,26 @@
   <div class="col-md-2"><button class="btn btn-primary w-100">Добави</button></div>
 </form>
 <table class="table table-striped">
-  <thead><tr><th>Сезон</th><th>Отбор</th><th>Ден</th><th>Час</th><th>Зала</th><th>Етикет</th></tr></thead>
+  <thead><tr><th>Сезон</th><th>Отбор</th><th>Ден</th><th>Час</th><th>Зала</th><th>Етикет</th><th></th></tr></thead>
   <tbody>
     {% for s in slots %}
     <tr>
       <td>{{ s.season_id }}</td>
-      <td>{{ (Team.query.get(s.team_id).name if s.team_id and Team.query.get(s.team_id) else '-') }}</td>
+      <td>
+        {% set t = Team.query.get(s.team_id) if s.team_id else None %}
+        {% if t %}
+          <span style="color: {{ team_color(t.name) }}; font-weight: 600">{{ t.name }}</span>
+        {% else %}-{% endif %}
+      </td>
       <td>{{ ['Пон','Вто','Сря','Чет','Пет','Съб','Нед'][s.weekday] }}</td>
       <td>{{ s.start_time }}–{{ s.end_time }}</td>
       <td>{{ s.venue or '-' }}</td>
       <td>{{ s.title or '-' }}</td>
+      <td class="text-end">
+        <form method="post" action="{{ url_for('delete_recurring_slot', slot_id=s.id) }}" onsubmit="return confirm('Изтриване на слота?');" style="display:inline">
+          <button class="btn btn-sm btn-outline-danger">Изтрий</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </tbody>

@@ -303,11 +303,26 @@ class RecurringSlot(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-    
-   # направи модела Team достъпен в Jinja шаблоните като 'Team'
+
+# Цветова схема за имена на отбори (ползва се в шаблони и календар)
+def team_color_for_name(name: str) -> str:
+    n = (name or '').lower()
+    if 'u-12' in n or ('момичета' in n and '12' in n and 'м' not in n):
+        return '#dc3545'  # червено U-12 Ж
+    if 'u-12 m' in n or ('u-12' in n and 'm' in n) or ('момчета' in n and '12' in n):
+        return '#0d6efd'  # синьо U-12 М
+    if 'момичета' in n and any(x in n for x in ['2009','2010','2011','2012','18']):
+        return '#d63384'  # магента U-18 Ж
+    if 'момчета' in n or 'мъже' in n:
+        return '#198754'  # зелено U-18 М / мъже
+    if 'старша' in n:
+        return '#6f42c1'  # лилаво
+    return '#0d6efd'
+
+# направи модела Team достъпен в Jinja шаблоните като 'Team' и функцията team_color
 @app.context_processor
 def inject_models():
-    return dict(Team=Team)
+    return dict(Team=Team, team_color=team_color_for_name)
  
 
 def role_required(role):
@@ -2076,6 +2091,20 @@ def api_calendar_events():
             return 'СТАДИОН'
         return ''
 
+    def team_color_for(name: str) -> str:
+        # Цветове по отбор (приближени към снимката)
+        n = (name or '').lower()
+        if 'момичета' in n and '12' in n:
+            return '#dc3545'  # червено U-12 Ж
+        if 'момичета' in n and any(x in n for x in ['2009', '2010', '2011', '2012', '18']):
+            return '#d63384'  # магента U-18 Ж групи
+        if 'момчета' in n:
+            return '#198754'  # зелено U-18 М
+        if 'старша' in n:
+            return '#6f42c1'  # лилаво
+        # fallback за други екипи
+        return '#0d6efd'      # синьо
+
     events = []
     for s in sessions:
         start_time = (s.start_time or '08:00')
@@ -2083,13 +2112,15 @@ def api_calendar_events():
         start_iso = f"{s.date.isoformat()}T{start_time}:00"
         end_iso = f"{s.date.isoformat()}T{end_time}:00"
         team_name = Team.query.get(s.team_id).name if s.team_id else '—'
+        color = team_color_for(team_name)
         events.append({
             'id': f'tr-{s.id}',
             'title': team_name,
             'start': start_iso,
             'end': end_iso,
             'venue': guess_venue(s.notes or ''),
-            'edit_url': url_for('edit_training', training_id=s.id)
+            'edit_url': url_for('edit_training', training_id=s.id),
+            'team_color': color
         })
 
     # We no longer render raw recurring slots here because they are materialized above.
@@ -2138,6 +2169,26 @@ def manage_recurring_slots():
         return redirect(url_for('manage_recurring_slots'))
     slots = RecurringSlot.query.order_by(RecurringSlot.weekday, RecurringSlot.start_time).all()
     return render_template('slots.html', seasons=seasons, teams=teams, slots=slots)
+
+@app.route('/admin/slots/<int:slot_id>/delete', methods=['POST'])
+@role_required('admin')
+def delete_recurring_slot(slot_id):
+    slot = RecurringSlot.query.get_or_404(slot_id)
+    db.session.delete(slot)
+    db.session.commit()
+    flash('Слотът е изтрит','success')
+    return redirect(url_for('manage_recurring_slots'))
+
+@app.route('/admin/slots/delete_all', methods=['POST'])
+@role_required('admin')
+def delete_all_trainings():
+    """Изтриване на всички TrainingSession (чистене на стар график)."""
+    count = TrainingSession.query.count()
+    Attendance.query.delete()
+    db.session.execute(db.delete(TrainingSession))
+    db.session.commit()
+    flash(f'Изтрити тренировки: {count}','success')
+    return redirect(url_for('trainings'))
 
 @app.route('/admin/seed_summer_2024_2025', methods=['POST'])
 @role_required('admin')
