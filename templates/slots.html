@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
-<h3>Седмични слотове</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Седмични слотове</h3>
+  <form method="post" action="{{ url_for('seed_summer_season') }}" onsubmit="return confirm('Въвеждане/презапис на ЛЕТЕН 2024/2025 график. Продължавате ли?');">
+    <button class="btn btn-outline-primary btn-sm">⚡ Въведи ЛЕТЕН 2024/2025</button>
+  </form>
+</div>
 <form method="post" class="row g-2 mb-3">
   <div class="col-md-3">
     <select name="season_id" class="form-select" required>
