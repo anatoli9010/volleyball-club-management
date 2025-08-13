@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Сезони</h3>
+<form method="post" class="row g-2 mb-3">
+  <div class="col-md-3"><input class="form-control" name="name" placeholder="Име (напр. Летен 2024/2025)" required></div>
+  <div class="col-md-2"><input class="form-control" type="date" name="start" placeholder="Начало"></div>
+  <div class="col-md-2"><input class="form-control" type="date" name="end" placeholder="Край"></div>
+  <div class="col-md-2 form-check d-flex align-items-center">
+    <input class="form-check-input" type="checkbox" name="is_active" id="is_active">
+    <label class="form-check-label ms-2" for="is_active">Активен</label>
+  </div>
+  <div class="col-md-2"><button class="btn btn-primary">Запази</button></div>
+</form>
+<table class="table table-striped">
+  <thead><tr><th>Име</th><th>Период</th><th>Статус</th></tr></thead>
+  <tbody>
+    {% for s in seasons %}
+    <tr>
+      <td>{{ s.name }}</td>
+      <td>{{ s.start_date or '-' }} — {{ s.end_date or '-' }}</td>
+      <td>{% if s.is_active %}<span class="badge bg-success">Активен</span>{% else %}<span class="badge bg-secondary">Неактивен</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

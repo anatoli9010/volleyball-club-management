@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Седмични слотове</h3>
+<form method="post" class="row g-2 mb-3">
+  <div class="col-md-3">
+    <select name="season_id" class="form-select" required>
+      {% for s in seasons %}
+        <option value="{{ s.id }}" {% if s.is_active %}selected{% endif %}>{{ s.name }}{% if s.is_active %} (активен){% endif %}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select name="team_id" class="form-select">
+      <option value="">— без отбор —</option>
+      {% for t in teams %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="weekday" class="form-select" required>
+      <option value="0">Понеделник</option>
+      <option value="1">Вторник</option>
+      <option value="2">Сряда</option>
+      <option value="3">Четвъртък</option>
+      <option value="4">Петък</option>
+      <option value="5">Събота</option>
+      <option value="6">Неделя</option>
+    </select>
+  </div>
+  <div class="col-md-2"><input name="start_time" class="form-control" type="time" required></div>
+  <div class="col-md-2"><input name="end_time" class="form-control" type="time" required></div>
+  <div class="col-md-2"><input name="venue" class="form-control" placeholder="Зала (НУПИ/Чавдар/Стадион)"></div>
+  <div class="col-md-3"><input name="title" class="form-control" placeholder="Етикет (напр. Момичета до 12г)"></div>
+  <div class="col-md-2"><button class="btn btn-primary w-100">Добави</button></div>
+</form>
+<table class="table table-striped">
+  <thead><tr><th>Сезон</th><th>Отбор</th><th>Ден</th><th>Час</th><th>Зала</th><th>Етикет</th></tr></thead>
+  <tbody>
+    {% for s in slots %}
+    <tr>
+      <td>{{ s.season_id }}</td>
+      <td>{{ s.team.name if s.team_id else '-' }}</td>
+      <td>{{ ['Пон','Вто','Сря','Чет','Пет','Съб','Нед'][s.weekday] }}</td>
+      <td>{{ s.start_time }}–{{ s.end_time }}</td>
+      <td>{{ s.venue or '-' }}</td>
+      <td>{{ s.title or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

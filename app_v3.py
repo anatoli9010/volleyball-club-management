@@ -4,7 +4,7 @@ import re
 import time
 import threading
 from pathlib import Path
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from functools import wraps
 import logging
 
@@ -280,6 +280,23 @@ class Attendance(db.Model):
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False, default='absent')  # present/absent
     noted_at = db.Column(db.DateTime, nullable=True)
+
+class Season(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+    is_active = db.Column(db.Boolean, default=False)
+
+class RecurringSlot(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    weekday = db.Column(db.Integer, nullable=False)  # 0=Mon ... 6=Sun
+    start_time = db.Column(db.String(5), nullable=False)  # HH:MM
+    end_time = db.Column(db.String(5), nullable=False)
+    venue = db.Column(db.String(50), nullable=True)  # НУПИ / Чавдар / Стадион
+    title = db.Column(db.String(120), nullable=True)  # optional label (e.g. Момичета до 12г)
 
 # -------------------- Auth & Roles --------------------
 @login_manager.user_loader
@@ -2000,7 +2017,6 @@ def calendar_view():
 @app.route('/api/calendar/events')
 @login_required
 def api_calendar_events():
-    # Parse range (optional)
     start = request.args.get('start')
     end = request.args.get('end')
 
@@ -2034,22 +2050,98 @@ def api_calendar_events():
 
     events = []
     for s in sessions:
-        # Compose start/end ISO datetimes
         start_time = (s.start_time or '08:00')
         end_time = (s.end_time or '09:00')
         start_iso = f"{s.date.isoformat()}T{start_time}:00"
         end_iso = f"{s.date.isoformat()}T{end_time}:00"
-
         team_name = Team.query.get(s.team_id).name if s.team_id else '—'
-        title = f"{team_name}"
-
         events.append({
-            'id': s.id,
-            'title': title,
+            'id': f'tr-{s.id}',
+            'title': team_name,
             'start': start_iso,
             'end': end_iso,
             'venue': guess_venue(s.notes or ''),
             'edit_url': url_for('edit_training', training_id=s.id)
         })
 
+    # Include recurring slots for active season
+    active_season = Season.query.filter_by(is_active=True).first()
+    if active_season:
+        # Generate occurrences within requested range
+        if start:
+            try:
+                range_start = datetime.fromisoformat(start[:10]).date()
+            except Exception:
+                range_start = active_season.start_date or date.today()
+        else:
+            range_start = active_season.start_date or date.today()
+        if end:
+            try:
+                range_end = datetime.fromisoformat(end[:10]).date()
+            except Exception:
+                range_end = active_season.end_date or range_start
+        else:
+            range_end = active_season.end_date or range_start
+
+        slots = RecurringSlot.query.filter_by(season_id=active_season.id).all()
+        d = range_start
+        while d <= range_end:
+            for slot in slots:
+                if d.weekday() == slot.weekday:
+                    start_iso = f"{d.isoformat()}T{slot.start_time}:00"
+                    end_iso = f"{d.isoformat()}T{slot.end_time}:00"
+                    team_name = Team.query.get(slot.team_id).name if slot.team_id else (slot.title or '—')
+                    events.append({
+                        'id': f'rs-{slot.id}-{d.isoformat()}',
+                        'title': team_name,
+                        'start': start_iso,
+                        'end': end_iso,
+                        'venue': (slot.venue or ''),
+                        'edit_url': url_for('manage_recurring_slots')
+                    })
+            d = d + timedelta(days=1)
+
     return jsonify(events)
+
+# -------- Season & Recurring slots (basic admin) --------
+@app.route('/admin/seasons', methods=['GET','POST'])
+@role_required('admin')
+def manage_seasons():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        start = request.form.get('start')
+        end = request.form.get('end')
+        active = bool(request.form.get('is_active'))
+        s = Season(name=name,
+                   start_date=datetime.fromisoformat(start).date() if start else None,
+                   end_date=datetime.fromisoformat(end).date() if end else None,
+                   is_active=active)
+        if active:
+            Season.query.update({Season.is_active: False})
+            s.is_active = True
+        db.session.add(s); db.session.commit()
+        flash('Сезонът е записан','success')
+        return redirect(url_for('manage_seasons'))
+    seasons = Season.query.order_by(Season.id.desc()).all()
+    return render_template('seasons.html', seasons=seasons)
+
+@app.route('/admin/slots', methods=['GET','POST'])
+@role_required('admin')
+def manage_recurring_slots():
+    seasons = Season.query.order_by(Season.id.desc()).all()
+    teams = Team.query.order_by(Team.name).all()
+    if request.method == 'POST':
+        season_id = request.form.get('season_id', type=int)
+        team_id = request.form.get('team_id', type=int)
+        weekday = request.form.get('weekday', type=int)
+        start_time = request.form.get('start_time')
+        end_time = request.form.get('end_time')
+        venue = request.form.get('venue')
+        title = request.form.get('title')
+        slot = RecurringSlot(season_id=season_id, team_id=team_id, weekday=weekday,
+                             start_time=start_time, end_time=end_time, venue=venue, title=title)
+        db.session.add(slot); db.session.commit()
+        flash('Слотът е добавен','success')
+        return redirect(url_for('manage_recurring_slots'))
+    slots = RecurringSlot.query.order_by(RecurringSlot.weekday, RecurringSlot.start_time).all()
+    return render_template('slots.html', seasons=seasons, teams=teams, slots=slots)
