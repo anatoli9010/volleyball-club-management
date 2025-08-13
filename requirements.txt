@@ -44,7 +44,7 @@ packaging==24.2
 pandas==2.3.1
 prometheus_client==0.22.1
 psutil==7.0.0
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 Pygments==2.19.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.0
