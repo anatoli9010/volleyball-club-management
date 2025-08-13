@@ -1327,6 +1327,43 @@ def delete_tournament(t_id):
     flash('Турнирът е изтрит','success')
     return redirect(url_for('tournaments'))
 
+@app.route('/tournaments/export/excel')
+@login_required
+@coach_permission_required('can_manage_tournaments')
+def export_tournaments_excel():
+    items = Tournament.query.order_by(Tournament.start_date.asc().nullslast(), Tournament.end_date.asc().nullslast(), Tournament.name.asc()).all()
+    rows = []
+    for t in items:
+        team_names = [Team.query.get(x.team_id).name for x in TournamentTeam.query.filter_by(tournament_id=t.id).all() if Team.query.get(x.team_id)]
+        start = t.start_date.strftime('%d.%m.%Y') if t.start_date else ''
+        end = t.end_date.strftime('%d.%m.%Y') if t.end_date else ''
+        date_str = f"{start} - {end}" if start and end else (start or end or '')
+        rows.append([date_str, t.name or '', t.venue or '', ", ".join(team_names), t.notes or ''])
+
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+    from io import BytesIO
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Турнири'
+
+    headers = ['Дата', 'Име', 'Локация', 'Отбори', 'Бележки/Резултат']
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+
+    widths = [18, 30, 22, 40, 40]
+    for idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = w
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True,
+                     download_name='tournaments.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 # ---------- Inventory management ----------
 class InventoryItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -26,6 +26,7 @@
           <li class="nav-item"><a class="nav-link" href="{{ url_for('teams') }}">Отбори</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('trainings') }}">Тренировки</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('stats_page') }}">📊 Статистика</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('tournaments') }}">Турнири</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('calendar_view') }}">Календар</a></li>
           {% if current_user.role == 'admin' %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_panel') }}">Админ</a></li>
@@ -64,6 +65,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('teams') }}">Отбори</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('trainings') }}">Тренировки</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('stats_page') }}">📊 Статистика</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('tournaments') }}">Турнири</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('calendar_view') }}">Календар</a></li>
         {% if current_user.role == 'admin' %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_panel') }}">Админ</a></li>

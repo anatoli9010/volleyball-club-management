@@ -11,7 +11,7 @@
           <div class="col"><input class="form-control" type="date" name="end_date" placeholder="Край"></div>
         </div>
         <input class="form-control my-2" name="venue" placeholder="Локация (зала/град)">
-        <textarea class="form-control mb-2" name="notes" placeholder="Бележки"></textarea>
+        <textarea class="form-control mb-2" name="notes" placeholder="Бележки (резултати, класиране, точки)"></textarea>
         <label class="form-label">Отбори</label>
         <select class="form-select" name="team_ids" multiple size="6">
           {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
@@ -22,9 +22,12 @@
   </div>
   <div class="col-md-7">
     <div class="card mb-3"><div class="card-body">
-      <h5 class="card-title">Списък</h5>
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Списък</h5>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_tournaments_excel') }}">Експорт в Excel</a>
+      </div>
       <table class="table table-sm">
-        <thead><tr><th>Име</th><th>Дати</th><th>Локация</th><th>Отбори</th><th></th></tr></thead>
+        <thead><tr><th>Име</th><th>Дати</th><th>Локация</th><th>Отбори</th><th>Бележки/Резултати</th><th></th></tr></thead>
         <tbody>
           {% for r in tournaments %}
           <tr>
@@ -32,6 +35,7 @@
             <td>{% if r.t.start_date %}{{ r.t.start_date.strftime('%d.%m.%Y') }}{% endif %}{% if r.t.end_date %} - {{ r.t.end_date.strftime('%d.%m.%Y') }}{% endif %}</td>
             <td>{{ r.t.venue }}</td>
             <td>{{ ', '.join(r.teams) }}</td>
+            <td>{{ r.t.notes }}</td>
             <td>
               <form method="post" action="{{ url_for('delete_tournament', t_id=r.t.id) }}" onsubmit="return confirm('Изтриване?');">
                 <button class="btn btn-danger btn-sm">Изтрий</button>
