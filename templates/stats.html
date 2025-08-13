@@ -15,10 +15,9 @@
                     <div class="col-auto">
                         <input type="month" name="end" class="form-control form-control-sm" placeholder="До месец">
                     </div>
-                    <div class="col-auto">
+                    <div class="col-auto d-flex align-items-center">
                         <button type="submit" class="btn btn-light btn-sm">📥 Свали CSV</button>
-<a href="{{ url_for('export_stats_payments_excel_v2') }}" class="btn btn-warning btn-sm ms-2">📊 Свали Excel</a>
-
+                        <a href="{{ url_for('export_stats_payments_excel_v2') }}" class="btn btn-warning btn-sm ms-2">📊 Свали Excel</a>
                     </div>
                 </form>
             </div>
@@ -31,19 +30,19 @@
     <!-- Статистика за присъствия -->
     <div class="card shadow-sm">
         <div class="card-header bg-primary text-white">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center w-100">
                 <h5 class="mb-2 mb-md-0">📅 Статистика за присъствия</h5>
-                <form method="get" action="{{ url_for('export_stats_attendance') }}" class="row g-2 align-items-center">
-                    <div class="col-auto">
-                        <input type="month" name="start" class="form-control form-control-sm" placeholder="От месец">
-                    </div>
-                    <div class="col-auto">
-                        <input type="month" name="end" class="form-control form-control-sm" placeholder="До месец">
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-light btn-sm">📥 Свали</button>
-                    </div>
-                </form>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('stats_attendance_by_player') }}" class="btn btn-light btn-sm">
+                        👤 Присъствие по състезатели
+                    </a>
+                    <a href="{{ url_for('stats_attendance_by_player_csv') }}" class="btn btn-outline-light btn-sm">
+                        📥 CSV (по състезатели)
+                    </a>
+                    <a href="{{ url_for('stats_attendance_by_player_excel') }}" class="btn btn-warning btn-sm">
+                        📊 Excel (по състезатели)
+                    </a>
+                </div>
             </div>
         </div>
         <div class="card-body">
