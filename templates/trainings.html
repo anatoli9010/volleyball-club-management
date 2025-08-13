@@ -1,28 +1,48 @@
 {% extends 'base.html' %}{% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>Тренировки</h3>
-  <div class="btn-group">
-    <a class="btn btn-success" href="{{ url_for('add_training') }}">➕ Добави тренировка</a>
+  <div class="d-flex align-items-center">
+    <form class="row g-2" method="get">
+      <div class="col-auto"><input class="form-control" name="month" value="{{ '%02d'|format(month) if month else '' }}" placeholder="Месец"></div>
+      <div class="col-auto"><input class="form-control" name="year" value="{{ year if year else '' }}" placeholder="Година"></div>
+      <div class="col-auto">
+        <select class="form-select" name="team_id">
+          <option value="">Всички отбори</option>
+          {% for t in teams %}
+            <option value="{{ t.id }}" {% if selected_team_id and selected_team_id==t.id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto"><button class="btn btn-outline-secondary">Филтър</button></div>
+    </form>
     {% if current_user.role == 'admin' %}
-      <form method="post" action="{{ url_for('delete_all_trainings') }}" onsubmit="return confirm('Наистина ли да изтрием всички тренировки?');">
+      <form class="ms-2" method="post" action="{{ url_for('admin_materialize_month') }}" onsubmit="return confirm('Материализиране на всички слотове за избрания месец?');">
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <button class="btn btn-outline-primary">Материализирай месеца</button>
+      </form>
+      <form class="ms-2" method="post" action="{{ url_for('delete_all_trainings') }}" onsubmit="return confirm('Наистина ли да изтрием всички тренировки?');">
         <button class="btn btn-outline-danger">🗑️ Изтрий всички</button>
       </form>
     {% endif %}
+    <a class="btn btn-success ms-2" href="{{ url_for('add_training') }}">➕ Добави тренировка</a>
   </div>
 </div>
 <table class="table">
-  <thead><tr><th>Дата</th><th>Отбор</th><th>Час</th><th>Бележки</th><th>Присъствие</th><th></th></tr></thead>
+  <thead><tr><th>Дата</th><th>Отбор</th><th>Час</th><th>Зала/Бележки</th><th class="text-end">Действия</th></tr></thead>
   <tbody>
     {% for tr in trainings %}
     <tr>
       <td>{{ tr.date.strftime('%d.%m.%Y') }}</td>
-      <td>{{ tr.session_team.name if tr.session_team else '—' }}</td>
+      <td>
+        {% if tr.session_team %}
+          <span style="color: {{ team_color(tr.session_team.name) }}; font-weight:600">{{ tr.session_team.name }}</span>
+        {% else %}—{% endif %}
+      </td>
       <td>{{ tr.start_time or '-' }} - {{ tr.end_time or '-' }}</td>
       <td>{{ tr.notes or '' }}</td>
-      <td>
-        <a class="btn btn-sm btn-primary" href="{{ url_for('attendance_form', training_id=tr.id) }}">Отбележи</a>
-      </td>
       <td class="text-end">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('attendance_form', training_id=tr.id) }}">Отбележи</a>
         <form method="post" action="{{ url_for('delete_training', training_id=tr.id) }}" onsubmit="return confirm('Изтриване на тренировката?');" style="display:inline">
           <button class="btn btn-sm btn-outline-danger">Изтрий</button>
         </form>
@@ -30,5 +50,10 @@
     </tr>
     {% endfor %}
   </tbody>
+  {% if trainings|length == 0 %}
+  <tfoot>
+    <tr><td colspan="5" class="text-center text-muted">Няма тренировки за избрания период.</td></tr>
+  </tfoot>
+  {% endif %}
 </table>
 {% endblock %}

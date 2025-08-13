@@ -1217,11 +1217,28 @@ def admin_import():
 @app.route('/trainings')
 @login_required
 def trainings():
-    trainings = TrainingSession.query.order_by(TrainingSession.date.desc()).all()
+    # Филтри по месец/година и отбор
+    today = date.today()
+    month = request.args.get('month', type=int) or today.month
+    year = request.args.get('year', type=int) or today.year
+    team_id = request.args.get('team_id', type=int)
+
+    q = TrainingSession.query
+    # по месец/година
+    q = q.filter(
+        extract('month', TrainingSession.date) == month,
+        extract('year', TrainingSession.date) == year
+    )
+    if team_id:
+        q = q.filter(TrainingSession.team_id == team_id)
+
+    trainings = q.order_by(TrainingSession.date.asc(), TrainingSession.start_time.asc()).all()
     # attach team for display convenience
     for t in trainings:
         t.session_team = Team.query.get(t.team_id) if t.team_id else None
-    return render_template('trainings.html', trainings=trainings)
+
+    teams = Team.query.order_by(Team.name).all()
+    return render_template('trainings.html', trainings=trainings, month=month, year=year, teams=teams, selected_team_id=team_id)
 
 @app.route('/trainings/add', methods=['GET', 'POST'])
 @login_required
@@ -2482,3 +2499,22 @@ def admin_materialize_slots():
     created = materialize_recurring_slots(rs, re_)
     flash(f'Създадени тренировки от слотове: {created}', 'success')
     return redirect(url_for('trainings'))
+
+@app.route('/admin/materialize_month', methods=['POST'])
+@role_required('admin')
+def admin_materialize_month():
+    """Материализира всички слотове за подадения месец (year, month)."""
+    y = request.form.get('year', type=int)
+    m = request.form.get('month', type=int)
+    if not y or not m:
+        flash('Липсват year/month', 'error')
+        return redirect(url_for('trainings'))
+    # първи и последен ден на месеца
+    start = date(y, m, 1)
+    if m == 12:
+        end = date(y + 1, 1, 1) - timedelta(days=1)
+    else:
+        end = date(y, m + 1, 1) - timedelta(days=1)
+    created = materialize_recurring_slots(start, end)
+    flash(f'Материализирани тренировки за {m:02d}.{y}: {created}', 'success')
+    return redirect(url_for('trainings', year=y, month=m))
