@@ -2256,30 +2256,107 @@ def seed_summer_season():
     flash('Летният график е въведен и сезонът е активен.','success')
     return redirect(url_for('manage_recurring_slots'))
 
+# --- Seed from image (U-12 Ж/М, U-18 Ж/М) ---
+@app.route('/admin/seed_from_image', methods=['POST'])
+@role_required('admin')
+def seed_from_image():
+    name = 'ЛЕТЕН Сезон 2024/2025'
+    # Activate or create season
+    season = Season.query.filter_by(name=name).first()
+    if not season:
+        Season.query.update({Season.is_active: False})
+        season = Season(name=name, is_active=True)
+        db.session.add(season); db.session.commit()
+    else:
+        Season.query.update({Season.is_active: False})
+        season.is_active = True; db.session.commit()
+
+    ensure_schedule_teams()
+
+    def team_id_by(name):
+        t = Team.query.filter_by(name=name).first()
+        return t.id if t else None
+
+    def add(weekday, start_time, end_time, venue, title):
+        return RecurringSlot(
+            season_id=season.id,
+            team_id=team_id_by(title),
+            weekday=weekday,
+            start_time=start_time,
+            end_time=end_time,
+            venue=venue,
+            title=title
+        )
+
+    slots = [
+        # Понеделник (0)
+        add(0, '08:00', '09:00', 'СТАДИОН', 'U-12 Ж'),
+        add(0, '08:00', '09:00', 'СТАДИОН', 'U-12 М'),
+        add(0, '10:00', '11:30', 'ЧАВДАР', 'U-18 Ж'),
+        add(0, '16:00', '17:30', 'НУПИ', 'U-12 Ж'),
+        add(0, '17:30', '19:00', 'НУПИ', 'U-12 Ж'),
+        add(0, '19:30', '21:15', 'ЧАВДАР', 'U-18 М'),
+        # Вторник (1)
+        add(1, '10:00', '11:30', 'ЧАВДАР', 'U-18 Ж'),
+        add(1, '11:00', '12:30', 'ЧАВДАР', 'U-18 М'),
+        # Сряда (2)
+        add(2, '08:00', '09:00', 'СТАДИОН', 'U-12 Ж'),
+        add(2, '08:00', '09:00', 'СТАДИОН', 'U-12 М'),
+        add(2, '10:00', '11:30', 'ЧАВДАР', 'U-18 Ж'),
+        add(2, '16:00', '17:30', 'НУПИ', 'U-12 Ж'),
+        add(2, '17:30', '19:00', 'НУПИ', 'U-12 М'),
+        add(2, '19:30', '21:30', 'ЧАВДАР', 'U-18 М'),
+        # Четвъртък (3)
+        add(3, '08:00', '09:00', 'СТАДИОН', 'U-18 М'),
+        add(3, '10:00', '11:30', 'НУПИ', 'U-12 Ж'),
+        add(3, '11:30', '13:00', 'НУПИ', 'U-12 Ж'),
+        # Петък (4)
+        add(4, '08:30', '10:00', 'НУПИ', 'U-18 Ж'),
+        add(4, '10:00', '11:30', 'НУПИ', 'U-12 М'),
+        add(4, '10:00', '12:00', 'НУПИ', 'U-12 М'),
+        # Събота (5)
+        add(5, '19:30', '21:15', 'ЧАВДАР', 'U-18 М'),
+    ]
+
+    # Clear previous slots of the season and all future materialized trainings
+    RecurringSlot.query.filter_by(season_id=season.id).delete()
+    db.session.add_all(slots)
+    db.session.commit()
+
+    # По желание: изчистваме всички тренировки (стар график)
+    Attendance.query.delete()
+    db.session.execute(db.delete(TrainingSession))
+    db.session.commit()
+
+    flash('Графикът от снимката е въведен. Старите тренировки са изтрити.','success')
+    return redirect(url_for('manage_recurring_slots'))
+
 # -------- Helpers: Teams normalization and materialization of slots --------
 
 SCHEDULE_TEAM_NAMES = [
-    'Момичета до 12г',
-    'Момичета 2009/10/11/12',
-    'Момчета 2009/10/11/12',
+    'U-12 Ж',
+    'U-12 М',
+    'U-18 Ж',
+    'U-18 М',
     'Старша',
-    'Старша+Мъже',
 ]
 
 def ensure_schedule_teams():
     """Ensure teams matching schedule names exist. Optionally rename default U* teams."""
     existing_by_name = {t.name: t for t in Team.query.all()}
 
-    # Heuristic renames from default demo names to requested BG names
+    # Try to normalize some demo names into the new scheme
     rename_map = {}
     for t in Team.query.all():
         lname = (t.name or '').lower()
-        if 'u12' in lname and 'girls' in lname:
-            rename_map[t.id] = 'Момичета до 12г'
-        elif 'u12' in lname and 'boys' in lname:
-            rename_map[t.id] = 'Момчета 2009/10/11/12'
-        elif ('u14' in lname or 'u16' in lname) and 'girls' in lname:
-            rename_map[t.id] = 'Момичета 2009/10/11/12'
+        if ('u12' in lname and 'girls' in lname) or 'момичета до 12' in lname:
+            rename_map[t.id] = 'U-12 Ж'
+        elif ('u12' in lname and 'boys' in lname) or ('момчета' in lname and '12' in lname):
+            rename_map[t.id] = 'U-12 М'
+        elif ('u18' in lname and 'girls' in lname) or ('момичета' in lname and '18' in lname):
+            rename_map[t.id] = 'U-18 Ж'
+        elif ('u18' in lname and 'boys' in lname) or ('момчета' in lname and '18' in lname) or ('мъже' in lname):
+            rename_map[t.id] = 'U-18 М'
         elif 'senior' in lname or 'старша' in lname:
             rename_map[t.id] = 'Старша'
     # Apply renames if target name not already taken

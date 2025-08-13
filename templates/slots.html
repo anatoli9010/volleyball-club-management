@@ -5,6 +5,9 @@
   <form method="post" action="{{ url_for('seed_summer_season') }}" onsubmit="return confirm('Въвеждане/презапис на ЛЕТЕН 2024/2025 график. Продължавате ли?');">
     <button class="btn btn-outline-primary btn-sm">⚡ Въведи ЛЕТЕН 2024/2025</button>
   </form>
+  <form method="post" action="{{ url_for('seed_from_image') }}" onsubmit="return confirm('Да въведа графика от снимката и да изтрия старите тренировки?');" class="ms-2">
+    <button class="btn btn-outline-success btn-sm">🖼️ Въведи графика от снимката</button>
+  </form>
 </div>
 <form method="post" class="row g-2 mb-3">
   <div class="col-md-3">
