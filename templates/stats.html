@@ -27,26 +27,28 @@
         </div>
     </div>
 
-    <!-- Статистика за присъствия -->
+    <!-- Статистика за присъствия по състезатели -->
     <div class="card shadow-sm">
         <div class="card-header bg-primary text-white">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center w-100">
-                <h5 class="mb-2 mb-md-0">📅 Статистика за присъствия</h5>
+                <h5 class="mb-2 mb-md-0">📅 Статистика за присъствие по състезатели</h5>
                 <div class="d-flex flex-wrap gap-2">
                     <a href="{{ url_for('stats_attendance_by_player') }}" class="btn btn-light btn-sm">
-                        👤 Присъствие по състезатели
+                        👤 Преглед таблица
                     </a>
                     <a href="{{ url_for('stats_attendance_by_player_csv') }}" class="btn btn-outline-light btn-sm">
-                        📥 CSV (по състезатели)
+                        📥 CSV
                     </a>
                     <a href="{{ url_for('stats_attendance_by_player_excel') }}" class="btn btn-warning btn-sm">
-                        📊 Excel (по състезатели)
+                        📊 Excel
                     </a>
                 </div>
             </div>
         </div>
         <div class="card-body">
-            <canvas id="attendanceChart" style="max-height: 300px;"></canvas>
+            <div class="text-muted">
+                Използвайте бутоните горе, за да видите или изтеглите подробна статистика по състезатели.
+            </div>
         </div>
     </div>
 
@@ -80,31 +82,6 @@
         options: {
             responsive: true,
             plugins: { legend: { position: 'top' } }
-        }
-    });
-
-    // Присъствия диаграма
-    new Chart(document.getElementById('attendanceChart'), {
-        type: 'line',
-        data: {
-            labels: {{ attendance_labels|tojson }},
-            datasets: [
-                {
-                    label: 'Средно присъствие (%)',
-                    data: {{ attendance_percent|tojson }},
-                    borderColor: 'rgba(0, 123, 255, 1)',
-                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                    fill: true,
-                    tension: 0.3,
-                    pointBackgroundColor: 'rgba(0, 123, 255, 1)',
-                    pointRadius: 4
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'top' } },
-            scales: { y: { beginAtZero: true, max: 100 } }
         }
     });
 </script>
