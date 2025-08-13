@@ -1765,6 +1765,7 @@ def pay_payment():
 def init_app():
     """Initialize the application - create tables and admin user."""
     with app.app_context():
+        ensure_templates()
         db.create_all()
         
         # Create admin user if it doesn't exist
@@ -1783,8 +1784,18 @@ def init_app():
         try:
             # Monthly reminders (hourly check)
             scheduler.add_job(send_monthly_reminders, 'interval', minutes=60, id='monthly_reminders', replace_existing=True)
-            # Materialize upcoming week from recurring slots once per day
-            scheduler.add_job(scheduled_materialize_upcoming, 'cron', hour=3, minute=0, id='materialize_slots_daily', replace_existing=True)
+
+            # Daily materialization wrapper (defers import until run time)
+            def _materialize_wrapper():
+                try:
+                    from datetime import date, timedelta
+                    from app_v3 import materialize_recurring_slots
+                    materialize_recurring_slots(date.today(), date.today() + timedelta(days=7))
+                except Exception:
+                    logger.exception('materialize wrapper failed')
+
+            scheduler.add_job(_materialize_wrapper, 'cron', hour=3, minute=0, id='materialize_slots_daily', replace_existing=True)
+
             if not scheduler.running:
                 scheduler.start()
         except Exception:
