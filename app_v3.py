@@ -4,7 +4,7 @@ import re
 import time
 import threading
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from functools import wraps
 import logging
 
@@ -22,7 +22,7 @@ import smtplib
 from email.message import EmailMessage
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import case
+from sqlalchemy import case, extract
 
 # Telegram imports
 from telegram import Update
@@ -205,7 +205,6 @@ def telegram_webhook():
 
 
 
-@app.before_first_request
 def maybe_set_webhook():
     """Опционално задава webhook при старт ако сме в Render и имаме hostname + token."""
     try:
@@ -984,8 +983,8 @@ def stats_page():
         Payment.month,
         Payment.year,
         db.func.count(Payment.id).label("total"),
-        db.func.sum(db.case((Payment.status == 'paid', 1), else_=0)).label("paid"),
-        db.func.sum(db.case((Payment.status != 'paid', 1), else_=0)).label("unpaid")
+        db.func.sum(case((Payment.status == 'paid', 1), else_=0)).label("paid"),
+        db.func.sum(case((Payment.status != 'paid', 1), else_=0)).label("unpaid")
     ).group_by(Payment.year, Payment.month).order_by(Payment.year, Payment.month).all()
 
     payments_labels = [f"{p.month:02d}/{p.year}" for p in payments_stats]
@@ -994,8 +993,8 @@ def stats_page():
 
     # --- Присъствия ---
     attendance_stats = db.session.query(
-        db.extract('month', TrainingSession.date).label("month"),
-        db.extract('year', TrainingSession.date).label("year"),
+        extract('month', TrainingSession.date).label("month"),
+        extract('year', TrainingSession.date).label("year"),
         db.func.avg(case((Attendance.status == 'present', 1), else_=0)).label("attendance_percent")
     ).join(Attendance, Attendance.session_id == TrainingSession.id) \
      .group_by("year", "month") \
@@ -1235,11 +1234,11 @@ def attendance_form(training_id):
             if a:
                 if a.status != new_status:
                     a.status = new_status
-                    a.noted_at = datetime.utcnow()
+                    a.noted_at = datetime.now(timezone.utc)
                     db.session.commit()
                     changed.append((p, new_status))
             else:
-                a = Attendance(session_id=training.id, player_id=p.id, status=new_status, noted_at=datetime.utcnow())
+                a = Attendance(session_id=training.id, player_id=p.id, status=new_status, noted_at=datetime.now(timezone.utc))
                 db.session.add(a); db.session.commit()
                 changed.append((p, new_status))
         # if notify requested, send messages
@@ -1470,8 +1469,8 @@ def export_stats_payments_excel_v2():
 @role_required('trainer')
 def export_stats_attendance():
     attendance_stats = db.session.query(
-        db.extract('month', TrainingSession.date).label("month"),
-        db.extract('year', TrainingSession.date).label("year"),
+        extract('month', TrainingSession.date).label("month"),
+        extract('year', TrainingSession.date).label("year"),
         db.func.avg(case((Attendance.status == 'present', 1), else_=0)).label("attendance_percent")
     ).join(Attendance, Attendance.session_id == TrainingSession.id) \
      .group_by("year", "month") \
@@ -1742,59 +1741,26 @@ def pay_payment():
 
 
 
-    # --- Присъствие по месеци ---
-    attendance_stats = db.session.query(
-        Training.month,
-        Training.year,
-        db.func.avg(Attendance.status == 'present').label("attendance_percent")
-    ).join(Attendance, Attendance.training_id == Training.id) \
-     .group_by(Training.year, Training.month) \
-     .order_by(Training.year, Training.month).all()
-
-    attendance_labels = [f"{row.month:02d}/{row.year}" for row in attendance_stats]
-    attendance_percent = [round(row.attendance_percent * 100, 2) if row.attendance_percent else 0 for row in attendance_stats]
-
-    return render_template(
-        'stats.html',
-        payments_labels=payments_labels or [],
-        payments_paid=payments_paid or [],
-        payments_unpaid=payments_unpaid or [],
-        attendance_labels=attendance_labels or [],
-        attendance_percent=attendance_percent or []
-    )
 
 
-    # --- Присъствия на играчите ---
-    attendance_stats = db.session.query(
-        Player.full_name,
-        db.func.count(TrainingAttendance.id).label("total"),
-        db.func.sum(db.case((TrainingAttendance.status == 'present', 1), else_=0)).label("present")
-    ).join(TrainingAttendance.player).group_by(Player.id).all()
 
-    attendance_stats_list = []
-    for a in attendance_stats:
-        percent = round((a.present / a.total) * 100, 1) if a.total else 0
-        attendance_stats_list.append({
-            "full_name": a.full_name,
-            "present": a.present,
-            "total": a.total,
-            "percent": percent
-        })
-
-    attendance_labels = [row['full_name'] for row in attendance_stats_list]
-    attendance_percent = [row['percent'] for row in attendance_stats_list]
-
-    return render_template(
-        "stats.html",
-        payments_stats=payments_stats_list,
-        attendance_stats=attendance_stats_list,
-        payments_labels=payments_labels,
-        payments_paid=payments_paid,
-        payments_unpaid=payments_unpaid,
-        attendance_labels=attendance_labels,
-        attendance_percent=attendance_percent
-    )
-
+# -------------------- Initialize App --------------------
+def init_app():
+    """Initialize the application - create tables and admin user."""
+    with app.app_context():
+        db.create_all()
+        
+        # Create admin user if it doesn't exist
+        admin_user = User.query.filter_by(username='admin').first()
+        if not admin_user:
+            admin_user = User(username='admin', role='admin')
+            admin_user.set_password('admin123')
+            db.session.add(admin_user)
+            db.session.commit()
+            logger.info("Admin user created")
+        
+        # Set webhook if in production
+        maybe_set_webhook()
 
 # -------------------- Run --------------------
 if __name__ == '__main__':
