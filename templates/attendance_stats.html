@@ -1,15 +1,123 @@
-{% extends 'base.html' %}{% block content %}
-<h3>Статистика присъствия</h3>
-<h5>Играч: {{ player.full_name }}</h5>
-<p>Общо тренировки: {{ total }}, Присъствия: {{ present }}, Процент: {{ percent }}%</p>
-<hr>
-<h5>Отбор: {{ team.name if team else '-' }}</h5>
-<table class="table">
-  <thead><tr><th>Играч</th><th>Общо</th><th>Присъства</th><th>%</th></tr></thead>
-  <tbody>
-    {% for r in rows %}
-    <tr><td>{{ r.full_name }}</td><td>{{ r.total }}</td><td>{{ r.present }}</td><td>{{ r.percent }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">
+                        <i class="bi bi-graph-up"></i> Статистика за присъствие по състезатели
+                    </h3>
+                    <div>
+                        <a href="{{ url_for('stats_attendance_by_player_csv') }}" class="btn btn-success btn-sm">
+                            <i class="bi bi-download"></i> CSV
+                        </a>
+                        <a href="{{ url_for('stats_attendance_by_player_excel') }}" class="btn btn-success btn-sm">
+                            <i class="bi bi-file-earmark-excel"></i> Excel
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if stats %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Състезател</th>
+                                    <th>Отбор</th>
+                                    <th class="text-center">Общо тренировки</th>
+                                    <th class="text-center">Присъствал</th>
+                                    <th class="text-center">Отсъствал</th>
+                                    <th class="text-center">Процент присъствие</th>
+                                    <th class="text-center">Прогрес</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in stats %}
+                                <tr>
+                                    <td><strong>{{ stat.full_name }}</strong></td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ stat.team_name }}</span>
+                                    </td>
+                                    <td class="text-center">{{ stat.total_sessions }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ stat.present_sessions }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-danger">{{ stat.absent_sessions }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ stat.percent }}%</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="progress" style="height: 20px;">
+                                            {% if stat.percent >= 80 %}
+                                                <div class="progress-bar bg-success" style="width: {{ stat.percent }}%">
+                                                    {{ stat.percent }}%
+                                                </div>
+                                            {% elif stat.percent >= 60 %}
+                                                <div class="progress-bar bg-warning" style="width: {{ stat.percent }}%">
+                                                    {{ stat.percent }}%
+                                                </div>
+                                            {% else %}
+                                                <div class="progress-bar bg-danger" style="width: {{ stat.percent }}%">
+                                                    {{ stat.percent }}%
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Summary Statistics -->
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ stats|length }}</h4>
+                                    <p class="mb-0">Общо състезатели</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ (stats|selectattr('percent', '>=', 80)|list)|length }}</h4>
+                                    <p class="mb-0">Отлична посещаемост (≥80%)</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ (stats|selectattr('percent', '>=', 60)|selectattr('percent', '<', 80)|list)|length }}</h4>
+                                    <p class="mb-0">Добра посещаемост (60-79%)</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ (stats|selectattr('percent', '<', 60)|list)|length }}</h4>
+                                    <p class="mb-0">Ниска посещаемост (<60%)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox display-1 text-muted"></i>
+                        <h4 class="text-muted mt-3">Няма данни за присъствие</h4>
+                        <p class="text-muted">Добавете тренировки и отбележете присъствие, за да видите статистиката.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

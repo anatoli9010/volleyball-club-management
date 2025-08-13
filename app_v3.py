@@ -640,11 +640,10 @@ def notify_attendance_change(player, training, status, note=None):
     time_range = ''
     if training.start_time or training.end_time:
         time_range = f' ({training.start_time or ""} - {training.end_time or ""})'
-    message = f'Напомняне: {player.full_name} е {"присъствал(а)" if status=="present" else "отсъствал(а)"} на тренировка на {when}{time_range}.'
+    message = f'🏐 {player.full_name} е {"✅ присъствал(а)" if status=="present" else "❌ отсъствал(а)"} на тренировка на {when}{time_range}.'
     if note:
-        message += f' Бележка: {note}'
-    # send email + telegram if available
-    send_email(player.email, f'Присъствие: {when}', message)
+        message += f'\n📝 Бележка: {note}'
+    # send only telegram for attendance notifications
     send_telegram(player.parent_telegram_id, message)
 
 # -------------------- Routes --------------------
@@ -1769,3 +1768,226 @@ init_app()
 if __name__ == '__main__':
     init_app()
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+# ---------- Attendance Statistics by Player ----------
+@app.route('/stats/attendance_by_player')
+@login_required
+@role_required('trainer')
+def stats_attendance_by_player():
+    # Взимаме статистика за присъствие по състезатели
+    attendance_stats = db.session.query(
+        Player.full_name,
+        Player.team_id,
+        db.func.count(Attendance.id).label("total_sessions"),
+        db.func.sum(case((Attendance.status == 'present', 1), else_=0)).label("present_sessions")
+    ).join(Attendance, Attendance.player_id == Player.id) \
+     .group_by(Player.id, Player.full_name, Player.team_id) \
+     .order_by(Player.full_name).all()
+
+    # Изчисляваме процентите
+    stats_list = []
+    for stat in attendance_stats:
+        percent = round((stat.present_sessions / stat.total_sessions) * 100, 1) if stat.total_sessions > 0 else 0
+        team_name = Team.query.get(stat.team_id).name if stat.team_id else "Без отбор"
+        stats_list.append({
+            "full_name": stat.full_name,
+            "team_name": team_name,
+            "total_sessions": stat.total_sessions,
+            "present_sessions": stat.present_sessions,
+            "absent_sessions": stat.total_sessions - stat.present_sessions,
+            "percent": percent
+        })
+
+    return render_template('attendance_stats.html', stats=stats_list)
+
+@app.route('/stats/attendance_by_player_csv')
+@login_required
+@role_required('trainer')
+def stats_attendance_by_player_csv():
+    # Взимаме статистика за присъствие по състезатели
+    attendance_stats = db.session.query(
+        Player.full_name,
+        Player.team_id,
+        db.func.count(Attendance.id).label("total_sessions"),
+        db.func.sum(case((Attendance.status == 'present', 1), else_=0)).label("present_sessions")
+    ).join(Attendance, Attendance.player_id == Player.id) \
+     .group_by(Player.id, Player.full_name, Player.team_id) \
+     .order_by(Player.full_name).all()
+
+    # Генерираме CSV
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # Заглавен ред
+    header = ["Състезател", "Отбор", "Общо тренировки", "Присъствал", "Отсъствал", "Процент присъствие"]
+    writer.writerow(header)
+
+    # Редове за състезатели
+    for stat in attendance_stats:
+        percent = round((stat.present_sessions / stat.total_sessions) * 100, 1) if stat.total_sessions > 0 else 0
+        team_name = Team.query.get(stat.team_id).name if stat.team_id else "Без отбор"
+        row = [
+            stat.full_name,
+            team_name,
+            stat.total_sessions,
+            stat.present_sessions,
+            stat.total_sessions - stat.present_sessions,
+            f"{percent}%"
+        ]
+        writer.writerow(row)
+
+    # Връщаме като отговор за сваляне
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendance_by_player.csv"}
+    )
+
+@app.route('/stats/attendance_by_player_excel')
+@login_required
+@role_required('trainer')
+def stats_attendance_by_player_excel():
+    # Взимаме статистика за присъствие по състезатели
+    attendance_stats = db.session.query(
+        Player.full_name,
+        Player.team_id,
+        db.func.count(Attendance.id).label("total_sessions"),
+        db.func.sum(case((Attendance.status == 'present', 1), else_=0)).label("present_sessions")
+    ).join(Attendance, Attendance.player_id == Player.id) \
+     .group_by(Player.id, Player.full_name, Player.team_id) \
+     .order_by(Player.full_name).all()
+
+    # Създаваме Excel файл
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Статистика присъствие"
+
+    # Стилове
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    center_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Заглавен ред
+    headers = ["Състезател", "Отбор", "Общо тренировки", "Присъствал", "Отсъствал", "Процент присъствие"]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_alignment
+
+    # Данни
+    for row, stat in enumerate(attendance_stats, 2):
+        percent = round((stat.present_sessions / stat.total_sessions) * 100, 1) if stat.total_sessions > 0 else 0
+        team_name = Team.query.get(stat.team_id).name if stat.team_id else "Без отбор"
+        
+        ws.cell(row=row, column=1, value=stat.full_name)
+        ws.cell(row=row, column=2, value=team_name)
+        ws.cell(row=row, column=3, value=stat.total_sessions)
+        ws.cell(row=row, column=4, value=stat.present_sessions)
+        ws.cell(row=row, column=5, value=stat.total_sessions - stat.present_sessions)
+        ws.cell(row=row, column=6, value=f"{percent}%")
+
+    # Автоматично разширяване на колоните
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Запазваме файла
+    from io import BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return Response(
+        output.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=attendance_by_player.xlsx"}
+    )
+
+# ---------- Admin ----------
+
+# ---------- Team Player Management ----------
+@app.route('/teams/<int:team_id>/players')
+@login_required
+@role_required('trainer')
+def team_players(team_id):
+    team = Team.query.get_or_404(team_id)
+    players = Player.query.filter_by(team_id=team_id).order_by(Player.full_name).all()
+    all_teams = Team.query.order_by(Team.name).all()
+    all_players = Player.query.order_by(Player.full_name).all()
+    
+    return render_template('team_players.html', team=team, players=players, all_teams=all_teams, all_players=all_players)
+
+@app.route('/teams/<int:team_id>/players/move', methods=['POST'])
+@login_required
+@role_required('trainer')
+def move_player_to_team():
+    player_id = request.form.get('player_id', type=int)
+    new_team_id = request.form.get('new_team_id', type=int)
+    
+    if not player_id or not new_team_id:
+        flash('Липсват данни', 'error')
+        return redirect(request.referrer or url_for('teams'))
+    
+    player = Player.query.get_or_404(player_id)
+    new_team = Team.query.get_or_404(new_team_id)
+    
+    old_team_name = player.team.name if player.team else "Без отбор"
+    player.team_id = new_team_id
+    db.session.commit()
+    
+    flash(f'Състезателят {player.full_name} е преместен от {old_team_name} в {new_team.name}', 'success')
+    return redirect(request.referrer or url_for('teams'))
+
+@app.route('/teams/<int:team_id>/players/remove', methods=['POST'])
+@login_required
+@role_required('trainer')
+def remove_player_from_team():
+    player_id = request.form.get('player_id', type=int)
+    
+    if not player_id:
+        flash('Липсват данни', 'error')
+        return redirect(request.referrer or url_for('teams'))
+    
+    player = Player.query.get_or_404(player_id)
+    team_name = player.team.name if player.team else "Без отбор"
+    player.team_id = None
+    db.session.commit()
+    
+    flash(f'Състезателят {player.full_name} е премахнат от {team_name}', 'success')
+    return redirect(request.referrer or url_for('teams'))
+
+@app.route('/teams/<int:team_id>/players/add', methods=['POST'])
+@login_required
+@role_required('trainer')
+def add_player_to_team():
+    team_id = request.form.get('team_id', type=int)
+    player_id = request.form.get('player_id', type=int)
+    
+    if not team_id or not player_id:
+        flash('Липсват данни', 'error')
+        return redirect(request.referrer or url_for('teams'))
+    
+    player = Player.query.get_or_404(player_id)
+    team = Team.query.get_or_404(team_id)
+    
+    old_team_name = player.team.name if player.team else "Без отбор"
+    player.team_id = team_id
+    db.session.commit()
+    
+    flash(f'Състезателят {player.full_name} е добавен в {team.name}', 'success')
+    return redirect(request.referrer or url_for('teams'))
+
+# ---------- Admin ----------
