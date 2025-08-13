@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Календар на тренировки</h3>
+  <div class="btn-group">
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('add_training') }}">➕ Нова тренировка</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('trainings') }}">Списък</a>
+  </div>
+</div>
+
+<div id='calendar'></div>
+
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet'>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js'></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+
+    const venueColors = {
+      'НУПИ': '#ffc107',   // amber
+      'ЧАВДАР': '#0dcaf0', // cyan
+      'СТАДИОН': '#198754' // green
+    };
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'timeGridWeek',
+      firstDay: 1,
+      slotMinTime: '06:00:00',
+      slotMaxTime: '22:00:00',
+      height: 'auto',
+      locale: 'bg',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      eventClick: function(info) {
+        if (info.event.extendedProps.editUrl) {
+          window.location.href = info.event.extendedProps.editUrl;
+        }
+      },
+      events: async function(fetchInfo, successCallback, failureCallback) {
+        try {
+          const params = new URLSearchParams({
+            start: fetchInfo.startStr,
+            end: fetchInfo.endStr
+          });
+          const resp = await fetch(`{{ url_for('api_calendar_events') }}?` + params.toString());
+          const data = await resp.json();
+
+          const events = data.map(ev => {
+            // color by venue
+            let color = venueColors[ev.venue?.toUpperCase?.() || ''] || '#6c757d';
+            return {
+              id: ev.id,
+              title: ev.title,
+              start: ev.start,
+              end: ev.end,
+              backgroundColor: color,
+              borderColor: color,
+              extendedProps: { editUrl: ev.edit_url }
+            };
+          });
+          successCallback(events);
+        } catch (e) {
+          failureCallback(e);
+        }
+      }
+    });
+
+    calendar.render();
+  });
+</script>
+{% endblock %}

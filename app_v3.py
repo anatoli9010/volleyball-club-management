@@ -1991,3 +1991,65 @@ def add_player_to_team():
     return redirect(request.referrer or url_for('teams'))
 
 # ---------- Admin ----------
+
+@app.route('/calendar')
+@login_required
+def calendar_view():
+    return render_template('calendar.html')
+
+@app.route('/api/calendar/events')
+@login_required
+def api_calendar_events():
+    # Parse range (optional)
+    start = request.args.get('start')
+    end = request.args.get('end')
+
+    q = TrainingSession.query
+    if start:
+        try:
+            start_date = datetime.fromisoformat(start[:10]).date()
+            q = q.filter(TrainingSession.date >= start_date)
+        except Exception:
+            pass
+    if end:
+        try:
+            end_date = datetime.fromisoformat(end[:10]).date()
+            q = q.filter(TrainingSession.date <= end_date)
+        except Exception:
+            pass
+
+    sessions = q.order_by(TrainingSession.date.asc()).all()
+
+    def guess_venue(notes: str) -> str:
+        if not notes:
+            return ''
+        text = notes.strip().upper()
+        if 'НУПИ' in text:
+            return 'НУПИ'
+        if 'ЧАВДАР' in text:
+            return 'ЧАВДАР'
+        if 'СТАДИОН' in text:
+            return 'СТАДИОН'
+        return ''
+
+    events = []
+    for s in sessions:
+        # Compose start/end ISO datetimes
+        start_time = (s.start_time or '08:00')
+        end_time = (s.end_time or '09:00')
+        start_iso = f"{s.date.isoformat()}T{start_time}:00"
+        end_iso = f"{s.date.isoformat()}T{end_time}:00"
+
+        team_name = Team.query.get(s.team_id).name if s.team_id else '—'
+        title = f"{team_name}"
+
+        events.append({
+            'id': s.id,
+            'title': title,
+            'start': start_iso,
+            'end': end_iso,
+            'venue': guess_venue(s.notes or ''),
+            'edit_url': url_for('edit_training', training_id=s.id)
+        })
+
+    return jsonify(events)
