@@ -1762,6 +1762,9 @@ def init_app():
         # Set webhook if in production
         maybe_set_webhook()
 
+# Initialize app when imported
+init_app()
+
 # -------------------- Run --------------------
 if __name__ == '__main__':
     init_app()
