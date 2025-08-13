@@ -4,6 +4,7 @@ import re
 import time
 import threading
 from pathlib import Path
+from typing import Optional
 from datetime import datetime, date, timezone, timedelta
 from functools import wraps
 import logging
@@ -1778,6 +1779,17 @@ def init_app():
         # Set webhook if in production
         maybe_set_webhook()
 
+        # Schedule background jobs
+        try:
+            # Monthly reminders (hourly check)
+            scheduler.add_job(send_monthly_reminders, 'interval', minutes=60, id='monthly_reminders', replace_existing=True)
+            # Materialize upcoming week from recurring slots once per day
+            scheduler.add_job(scheduled_materialize_upcoming, 'cron', hour=3, minute=0, id='materialize_slots_daily', replace_existing=True)
+            if not scheduler.running:
+                scheduler.start()
+        except Exception:
+            logger.exception('Failed to start scheduler jobs')
+
 # Initialize app when imported
 init_app()
 
@@ -2020,19 +2032,24 @@ def api_calendar_events():
     start = request.args.get('start')
     end = request.args.get('end')
 
+    # Determine range and materialize sessions from recurring slots automatically
+    try:
+        range_start = datetime.fromisoformat(start[:10]).date() if start else date.today()
+    except Exception:
+        range_start = date.today()
+    try:
+        range_end = datetime.fromisoformat(end[:10]).date() if end else (range_start + timedelta(days=14))
+    except Exception:
+        range_end = range_start + timedelta(days=14)
+
+    # Create TrainingSession from active season slots for the requested period
+    try:
+        materialize_recurring_slots(range_start, range_end)
+    except Exception:
+        logger.exception('materialize_recurring_slots during /api/calendar/events failed')
+
     q = TrainingSession.query
-    if start:
-        try:
-            start_date = datetime.fromisoformat(start[:10]).date()
-            q = q.filter(TrainingSession.date >= start_date)
-        except Exception:
-            pass
-    if end:
-        try:
-            end_date = datetime.fromisoformat(end[:10]).date()
-            q = q.filter(TrainingSession.date <= end_date)
-        except Exception:
-            pass
+    q = q.filter(TrainingSession.date >= range_start, TrainingSession.date <= range_end)
 
     sessions = q.order_by(TrainingSession.date.asc()).all()
 
@@ -2064,42 +2081,7 @@ def api_calendar_events():
             'edit_url': url_for('edit_training', training_id=s.id)
         })
 
-    # Include recurring slots for active season
-    active_season = Season.query.filter_by(is_active=True).first()
-    if active_season:
-        # Generate occurrences within requested range
-        if start:
-            try:
-                range_start = datetime.fromisoformat(start[:10]).date()
-            except Exception:
-                range_start = active_season.start_date or date.today()
-        else:
-            range_start = active_season.start_date or date.today()
-        if end:
-            try:
-                range_end = datetime.fromisoformat(end[:10]).date()
-            except Exception:
-                range_end = active_season.end_date or range_start
-        else:
-            range_end = active_season.end_date or range_start
-
-        slots = RecurringSlot.query.filter_by(season_id=active_season.id).all()
-        d = range_start
-        while d <= range_end:
-            for slot in slots:
-                if d.weekday() == slot.weekday:
-                    start_iso = f"{d.isoformat()}T{slot.start_time}:00"
-                    end_iso = f"{d.isoformat()}T{slot.end_time}:00"
-                    team_name = Team.query.get(slot.team_id).name if slot.team_id else (slot.title or '—')
-                    events.append({
-                        'id': f'rs-{slot.id}-{d.isoformat()}',
-                        'title': team_name,
-                        'start': start_iso,
-                        'end': end_iso,
-                        'venue': (slot.venue or ''),
-                        'edit_url': url_for('manage_recurring_slots')
-                    })
-            d = d + timedelta(days=1)
+    # We no longer render raw recurring slots here because they are materialized above.
 
     return jsonify(events)
 
@@ -2211,3 +2193,115 @@ def seed_summer_season():
     db.session.commit()
     flash('Летният график е въведен и сезонът е активен.','success')
     return redirect(url_for('manage_recurring_slots'))
+
+# -------- Helpers: Teams normalization and materialization of slots --------
+
+SCHEDULE_TEAM_NAMES = [
+    'Момичета до 12г',
+    'Момичета 2009/10/11/12',
+    'Момчета 2009/10/11/12',
+    'Старша',
+    'Старша+Мъже',
+]
+
+def ensure_schedule_teams():
+    """Ensure teams matching schedule names exist. Optionally rename default U* teams."""
+    existing_by_name = {t.name: t for t in Team.query.all()}
+
+    # Heuristic renames from default demo names to requested BG names
+    rename_map = {}
+    for t in Team.query.all():
+        lname = (t.name or '').lower()
+        if 'u12' in lname and 'girls' in lname:
+            rename_map[t.id] = 'Момичета до 12г'
+        elif 'u12' in lname and 'boys' in lname:
+            rename_map[t.id] = 'Момчета 2009/10/11/12'
+        elif ('u14' in lname or 'u16' in lname) and 'girls' in lname:
+            rename_map[t.id] = 'Момичета 2009/10/11/12'
+        elif 'senior' in lname or 'старша' in lname:
+            rename_map[t.id] = 'Старша'
+    # Apply renames if target name not already taken
+    for team_id, new_name in rename_map.items():
+        if new_name not in existing_by_name:
+            t = Team.query.get(team_id)
+            if t:
+                t.name = new_name
+                existing_by_name[new_name] = t
+    # Ensure all schedule teams exist
+    for n in SCHEDULE_TEAM_NAMES:
+        if n not in existing_by_name:
+            db.session.add(Team(name=n))
+    db.session.commit()
+
+def resolve_team_id_for_slot(slot: RecurringSlot) -> Optional[int]:
+    if slot.team_id:
+        return slot.team_id
+    # try match by title
+    title = (slot.title or '').strip()
+    if not title:
+        return None
+    team = Team.query.filter_by(name=title).first()
+    if not team:
+        team = Team(name=title)
+        db.session.add(team)
+        db.session.commit()
+    return team.id
+
+def materialize_recurring_slots(range_start: date, range_end: date) -> int:
+    """Create TrainingSession rows from active season RecurringSlot in the given range.
+    Returns number of created sessions.
+    """
+    created = 0
+    active_season = Season.query.filter_by(is_active=True).first()
+    if not active_season:
+        return 0
+    ensure_schedule_teams()
+    slots = RecurringSlot.query.filter_by(season_id=active_season.id).all()
+    d = range_start
+    while d <= range_end:
+        for slot in slots:
+            if d.weekday() != slot.weekday:
+                continue
+            team_id = resolve_team_id_for_slot(slot)
+            # prevent duplicates by (team_id, date, start_time)
+            exists = TrainingSession.query.filter_by(
+                team_id=team_id, date=d, start_time=slot.start_time
+            ).first()
+            if exists:
+                continue
+            ts = TrainingSession(
+                team_id=team_id,
+                date=d,
+                start_time=slot.start_time,
+                end_time=slot.end_time,
+                notes=slot.venue or slot.title or ''
+            )
+            db.session.add(ts)
+            created += 1
+        d = d + timedelta(days=1)
+    if created:
+        db.session.commit()
+    return created
+
+def scheduled_materialize_upcoming():
+    try:
+        with app.app_context():
+            materialize_recurring_slots(date.today(), date.today() + timedelta(days=7))
+    except Exception:
+        logger.exception('scheduled_materialize_upcoming failed')
+
+@app.route('/admin/materialize_slots', methods=['POST'])
+@role_required('admin')
+def admin_materialize_slots():
+    """Materialize slots to sessions in a given range (defaults next 14 days)."""
+    start_str = request.form.get('start')
+    end_str = request.form.get('end')
+    try:
+        rs = datetime.fromisoformat(start_str).date() if start_str else date.today()
+        re_ = datetime.fromisoformat(end_str).date() if end_str else (rs + timedelta(days=14))
+    except Exception:
+        rs = date.today()
+        re_ = rs + timedelta(days=14)
+    created = materialize_recurring_slots(rs, re_)
+    flash(f'Създадени тренировки от слотове: {created}', 'success')
+    return redirect(url_for('trainings'))

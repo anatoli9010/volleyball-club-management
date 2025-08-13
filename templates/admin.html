@@ -1,6 +1,12 @@
 {% extends 'base.html' %}{% block content %}
 <h3>Админ</h3>
-<div class="mb-3"><a class="btn btn-primary" href="{{ url_for('create_user') }}">Добави потребител</a></div>
+<div class="mb-3 d-flex gap-2">
+  <a class="btn btn-primary" href="{{ url_for('create_user') }}">Добави потребител</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('manage_recurring_slots') }}">Слотове (график)</a>
+  <form method="post" action="{{ url_for('admin_materialize_slots') }}" class="d-inline">
+    <button class="btn btn-success" title="Създай тренировки от слотовете за следващите 14 дни">Материализирай слотове → тренировки</button>
+  </form>
+</div>
 <div class="card mb-3"><div class="card-body">
 <h5>Импорт на състезатели (.csv)</h5>
 <form method="post" action="{{ url_for('admin_import') }}" enctype="multipart/form-data">
