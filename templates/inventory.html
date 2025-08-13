@@ -1,0 +1,53 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Инвентар</h3>
+<div class="row">
+  <div class="col-md-5">
+    <div class="card mb-3"><div class="card-body">
+      <h5 class="card-title">Нов артикул</h5>
+      <form method="post" action="{{ url_for('inventory') }}">
+        <input class="form-control mb-2" name="name" placeholder="Име" required>
+        <div class="row g-2">
+          <div class="col"><input class="form-control" name="quantity" type="number" placeholder="Количество" value="0"></div>
+          <div class="col"><input class="form-control" name="location" placeholder="Локация"></div>
+        </div>
+        <input class="form-control my-2" name="condition" placeholder="Състояние (добро/за ремонт)">
+        <textarea class="form-control mb-2" name="notes" placeholder="Бележки"></textarea>
+        <button class="btn btn-success">Добави</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-md-7">
+    <div class="card mb-3"><div class="card-body">
+      <h5 class="card-title">Списък</h5>
+      <table class="table table-sm">
+        <thead><tr><th>Име</th><th>Кол.</th><th>Локация</th><th>Състояние</th><th>Бележки</th><th></th></tr></thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td>{{ it.name }}</td>
+            <td>
+              <form method="post" action="{{ url_for('inventory_adjust', item_id=it.id) }}" class="d-flex gap-1">
+                <input type="hidden" name="delta" value="-1"><button class="btn btn-outline-secondary btn-sm">-</button>
+              </form>
+              {{ it.quantity }}
+              <form method="post" action="{{ url_for('inventory_adjust', item_id=it.id) }}" class="d-flex gap-1">
+                <input type="hidden" name="delta" value="1"><button class="btn btn-outline-secondary btn-sm">+</button>
+              </form>
+            </td>
+            <td>{{ it.location }}</td>
+            <td>{{ it.condition }}</td>
+            <td>{{ it.notes }}</td>
+            <td>
+              <form method="post" action="{{ url_for('inventory_delete', item_id=it.id) }}" onsubmit="return confirm('Изтриване?');">
+                <button class="btn btn-danger btn-sm">Изтрий</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+

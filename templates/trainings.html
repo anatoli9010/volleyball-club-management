@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>Тренировки</h3>
-  <div class="d-flex align-items-center">
+  <div class="d-none d-md-flex align-items-center">
     <form class="row g-2" method="get">
       <div class="col-auto"><input class="form-control" name="month" value="{{ '%02d'|format(month) if month else '' }}" placeholder="Месец"></div>
       <div class="col-auto"><input class="form-control" name="year" value="{{ year if year else '' }}" placeholder="Година"></div>
@@ -28,6 +28,42 @@
     <a class="btn btn-success ms-2" href="{{ url_for('add_training') }}">➕ Добави тренировка</a>
   </div>
 </div>
+
+<!-- Мобилен тулбар -->
+<div class="d-md-none mb-3">
+  <div class="d-grid gap-2">
+    <a class="btn btn-success" href="{{ url_for('add_training') }}">➕ Нова тренировка</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('calendar_view') }}">📅 Календар</a>
+    <a class="btn btn-outline-secondary" data-bs-toggle="collapse" href="#trainingsFilter" role="button">Филтри</a>
+  </div>
+  <div class="collapse mt-2" id="trainingsFilter">
+    <form class="row g-2" method="get">
+      <div class="col-6"><input class="form-control" name="month" value="{{ '%02d'|format(month) if month else '' }}" placeholder="Месец"></div>
+      <div class="col-6"><input class="form-control" name="year" value="{{ year if year else '' }}" placeholder="Година"></div>
+      <div class="col-12">
+        <select class="form-select" name="team_id">
+          <option value="">Всички отбори</option>
+          {% for t in teams %}
+            <option value="{{ t.id }}" {% if selected_team_id and selected_team_id==t.id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12"><button class="btn btn-primary w-100">Приложи</button></div>
+    </form>
+    {% if current_user.role == 'admin' %}
+      <form class="mt-2" method="post" action="{{ url_for('admin_materialize_month') }}" onsubmit="return confirm('Материализиране на всички слотове за избрания месец?');">
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <button class="btn btn-outline-primary w-100">Материализирай месеца</button>
+      </form>
+      <form class="mt-2" method="post" action="{{ url_for('delete_all_trainings') }}" onsubmit="return confirm('Наистина ли да изтрием всички тренировки?');">
+        <button class="btn btn-outline-danger w-100">🗑️ Изтрий всички</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="table-responsive">
 <table class="table">
   <thead><tr><th>Дата</th><th>Отбор</th><th>Час</th><th>Зала/Бележки</th><th class="text-end">Действия</th></tr></thead>
   <tbody>
@@ -56,4 +92,5 @@
   </tfoot>
   {% endif %}
 </table>
+</div>
 {% endblock %}

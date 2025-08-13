@@ -1,0 +1,48 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Турнири</h3>
+<div class="row">
+  <div class="col-md-5">
+    <div class="card mb-3"><div class="card-body">
+      <h5 class="card-title">Нов турнир</h5>
+      <form method="post" action="{{ url_for('tournaments') }}">
+        <input class="form-control mb-2" name="name" placeholder="Име" required>
+        <div class="row g-2">
+          <div class="col"><input class="form-control" type="date" name="start_date" placeholder="Начало"></div>
+          <div class="col"><input class="form-control" type="date" name="end_date" placeholder="Край"></div>
+        </div>
+        <input class="form-control my-2" name="venue" placeholder="Локация (зала/град)">
+        <textarea class="form-control mb-2" name="notes" placeholder="Бележки"></textarea>
+        <label class="form-label">Отбори</label>
+        <select class="form-select" name="team_ids" multiple size="6">
+          {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-success mt-2">Добави</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-md-7">
+    <div class="card mb-3"><div class="card-body">
+      <h5 class="card-title">Списък</h5>
+      <table class="table table-sm">
+        <thead><tr><th>Име</th><th>Дати</th><th>Локация</th><th>Отбори</th><th></th></tr></thead>
+        <tbody>
+          {% for r in tournaments %}
+          <tr>
+            <td>{{ r.t.name }}</td>
+            <td>{% if r.t.start_date %}{{ r.t.start_date.strftime('%d.%m.%Y') }}{% endif %}{% if r.t.end_date %} - {{ r.t.end_date.strftime('%d.%m.%Y') }}{% endif %}</td>
+            <td>{{ r.t.venue }}</td>
+            <td>{{ ', '.join(r.teams) }}</td>
+            <td>
+              <form method="post" action="{{ url_for('delete_tournament', t_id=r.t.id) }}" onsubmit="return confirm('Изтриване?');">
+                <button class="btn btn-danger btn-sm">Изтрий</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+

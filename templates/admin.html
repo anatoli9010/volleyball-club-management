@@ -1,8 +1,16 @@
 {% extends 'base.html' %}{% block content %}
 <h3>Админ</h3>
-<div class="mb-3 d-flex gap-2">
+<div class="mb-3 d-flex flex-wrap gap-2">
   <a class="btn btn-primary" href="{{ url_for('create_user') }}">Добави потребител</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('manage_seasons') }}">Сезони</a>
   <a class="btn btn-outline-secondary" href="{{ url_for('manage_recurring_slots') }}">Слотове (график)</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('calendar_view') }}">Календар</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin_coaches') }}">Треньори</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('tournaments') }}">Турнири</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('inventory') }}">Инвентар</a>
+  <form method="post" action="{{ url_for('seed_default_coaches') }}" class="d-inline" onsubmit="return confirm('Да създам профили Anatoli/Pepi?');">
+    <button class="btn btn-outline-primary">Създай треньори Anatoli/Pepi</button>
+  </form>
   <form method="post" action="{{ url_for('admin_materialize_slots') }}" class="d-inline">
     <button class="btn btn-success" title="Създай тренировки от слотовете за следващите 14 дни">Материализирай слотове → тренировки</button>
   </form>

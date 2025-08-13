@@ -299,6 +299,25 @@ class RecurringSlot(db.Model):
     venue = db.Column(db.String(50), nullable=True)  # НУПИ / Чавдар / Стадион
     title = db.Column(db.String(120), nullable=True)  # optional label (e.g. Момичета до 12г)
 
+# --- Coaches management ---
+class CoachProfile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    full_name = db.Column(db.String(120), nullable=True)
+    phone = db.Column(db.String(50), nullable=True)
+    # права (прост модел)
+    can_manage_players = db.Column(db.Boolean, default=True)
+    can_manage_payments = db.Column(db.Boolean, default=True)
+    can_mark_attendance = db.Column(db.Boolean, default=True)
+    can_manage_slots = db.Column(db.Boolean, default=False)
+    can_manage_tournaments = db.Column(db.Boolean, default=True)
+    can_manage_inventory = db.Column(db.Boolean, default=True)
+
+class CoachTeam(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    coach_id = db.Column(db.Integer, db.ForeignKey('coach_profile.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+
 # -------------------- Auth & Roles --------------------
 @login_manager.user_loader
 def load_user(user_id):
@@ -368,6 +387,23 @@ def role_required(role):
             if not current_user.is_authenticated:
                 return login_manager.unauthorized()
             if current_user.role != role and current_user.role != 'admin':
+                abort(403)
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def coach_permission_required(permission_attr: str):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return login_manager.unauthorized()
+            if current_user.role == 'admin':
+                return fn(*args, **kwargs)
+            if current_user.role != 'trainer':
+                abort(403)
+            cp = CoachProfile.query.filter_by(user_id=current_user.id).first()
+            if not cp or not getattr(cp, permission_attr, False):
                 abort(403)
             return fn(*args, **kwargs)
         return wrapper
@@ -1146,6 +1182,195 @@ def create_user():
         u = User(username=username, role=role); u.set_password(password); db.session.add(u); db.session.commit()
         flash('Потребител създаден','success'); return redirect(url_for('admin_panel'))
     return render_template('create_user.html')
+
+# ---------- Coaches (admin) ----------
+@app.route('/admin/coaches', methods=['GET','POST'])
+@role_required('admin')
+def admin_coaches():
+    if request.method == 'POST':
+        # Създаване на нов треньор (User + CoachProfile)
+        username = request.form.get('username')
+        password = request.form.get('password')
+        full_name = request.form.get('full_name')
+        phone = request.form.get('phone')
+        team_ids = request.form.getlist('team_ids')
+        if not username or not password:
+            flash('Потребителско име и парола са задължителни','error')
+            return redirect(url_for('admin_coaches'))
+        if User.query.filter_by(username=username).first():
+            flash('Потребител вече съществува','error')
+            return redirect(url_for('admin_coaches'))
+        u = User(username=username, role='trainer')
+        u.set_password(password)
+        db.session.add(u); db.session.commit()
+        cp = CoachProfile(user_id=u.id, full_name=full_name, phone=phone,
+                          can_manage_players=bool(request.form.get('can_manage_players')),
+                          can_manage_payments=bool(request.form.get('can_manage_payments')),
+                          can_mark_attendance=bool(request.form.get('can_mark_attendance')),
+                          can_manage_slots=bool(request.form.get('can_manage_slots')),
+                          can_manage_tournaments=bool(request.form.get('can_manage_tournaments')),
+                          can_manage_inventory=bool(request.form.get('can_manage_inventory')))
+        db.session.add(cp); db.session.commit()
+        for tid in team_ids:
+            if tid.isdigit():
+                db.session.add(CoachTeam(coach_id=cp.id, team_id=int(tid)))
+        db.session.commit()
+        flash('Треньорът е създаден','success')
+        return redirect(url_for('admin_coaches'))
+    coaches = CoachProfile.query.all()
+    coach_rows = []
+    for c in coaches:
+        user = User.query.get(c.user_id)
+        teams = [Team.query.get(ct.team_id).name for ct in CoachTeam.query.filter_by(coach_id=c.id).all() if Team.query.get(ct.team_id)]
+        coach_rows.append({'coach': c, 'user': user, 'teams': teams})
+    teams = Team.query.order_by(Team.name).all()
+    return render_template('coaches.html', coach_rows=coach_rows, teams=teams)
+
+@app.route('/admin/coaches/<int:coach_id>/teams', methods=['POST'])
+@role_required('admin')
+def admin_coach_set_teams(coach_id):
+    CoachTeam.query.filter_by(coach_id=coach_id).delete()
+    for tid in request.form.getlist('team_ids'):
+        if tid.isdigit():
+            db.session.add(CoachTeam(coach_id=coach_id, team_id=int(tid)))
+    db.session.commit()
+    flash('Отборите на треньора са обновени','success')
+    return redirect(url_for('admin_coaches'))
+
+@app.route('/admin/seed_coaches', methods=['POST'])
+@role_required('admin')
+def seed_default_coaches():
+    # Създава профили за Anatoli и Pepi (ако липсват)
+    def ensure(username, password, full_name):
+        u = User.query.filter_by(username=username).first()
+        if not u:
+            u = User(username=username, role='trainer')
+            u.set_password(password)
+            db.session.add(u); db.session.commit()
+        cp = CoachProfile.query.filter_by(user_id=u.id).first()
+        if not cp:
+            cp = CoachProfile(user_id=u.id, full_name=full_name, can_manage_players=True,
+                              can_manage_payments=True, can_mark_attendance=True,
+                              can_manage_slots=False, can_manage_tournaments=True,
+                              can_manage_inventory=True)
+            db.session.add(cp); db.session.commit()
+    ensure('anatoli', 'anatoli9010', 'Anatoli')
+    ensure('pepi', 'pepi2025', 'Pepi')
+    flash('Треньорите Anatoli и Pepi са налични/обновени','success')
+    return redirect(url_for('admin_coaches'))
+
+@app.route('/coaches/<int:coach_id>/schedule')
+@login_required
+def coach_schedule(coach_id):
+    # график за треньор: всички тренировки на отборите, към които е зачислен
+    month = request.args.get('month', type=int) or date.today().month
+    year = request.args.get('year', type=int) or date.today().year
+    team_ids = [ct.team_id for ct in CoachTeam.query.filter_by(coach_id=coach_id).all()]
+    q = TrainingSession.query 
+    q = q.filter(extract('month', TrainingSession.date)==month,
+                 extract('year', TrainingSession.date)==year)
+    if team_ids:
+        q = q.filter(TrainingSession.team_id.in_(team_ids))
+    trainings = q.order_by(TrainingSession.date.asc(), TrainingSession.start_time.asc()).all()
+    for t in trainings:
+        t.session_team = Team.query.get(t.team_id) if t.team_id else None
+    return render_template('trainings.html', trainings=trainings, month=month, year=year, teams=Team.query.order_by(Team.name).all(), selected_team_id=None)
+
+# ---------- Tournament management ----------
+class Tournament(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+    venue = db.Column(db.String(120), nullable=True)
+    notes = db.Column(db.String(400), nullable=True)
+
+class TournamentTeam(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+
+@app.route('/tournaments', methods=['GET','POST'])
+@login_required
+@coach_permission_required('can_manage_tournaments')
+def tournaments():
+    if request.method == 'POST':
+        t = Tournament(
+            name=request.form.get('name'),
+            start_date=datetime.fromisoformat(request.form.get('start_date')).date() if request.form.get('start_date') else None,
+            end_date=datetime.fromisoformat(request.form.get('end_date')).date() if request.form.get('end_date') else None,
+            venue=request.form.get('venue'),
+            notes=request.form.get('notes')
+        )
+        db.session.add(t); db.session.commit()
+        for tid in request.form.getlist('team_ids'):
+            if tid.isdigit():
+                db.session.add(TournamentTeam(tournament_id=t.id, team_id=int(tid)))
+        db.session.commit()
+        flash('Турнирът е добавен','success')
+        return redirect(url_for('tournaments'))
+    items = Tournament.query.order_by(Tournament.start_date.desc().nullslast()).all()
+    teams = Team.query.order_by(Team.name).all()
+    rows = []
+    for t in items:
+        t_teams = [Team.query.get(x.team_id).name for x in TournamentTeam.query.filter_by(tournament_id=t.id).all() if Team.query.get(x.team_id)]
+        rows.append({'t': t, 'teams': t_teams})
+    return render_template('tournaments.html', tournaments=rows, teams=teams)
+
+@app.route('/tournaments/<int:t_id>/delete', methods=['POST'])
+@login_required
+@coach_permission_required('can_manage_tournaments')
+def delete_tournament(t_id):
+    TournamentTeam.query.filter_by(tournament_id=t_id).delete()
+    Tournament.query.filter_by(id=t_id).delete()
+    db.session.commit()
+    flash('Турнирът е изтрит','success')
+    return redirect(url_for('tournaments'))
+
+# ---------- Inventory management ----------
+class InventoryItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=0)
+    location = db.Column(db.String(120), nullable=True)  # НУПИ/Чавдар/Стадион/склад
+    condition = db.Column(db.String(120), nullable=True) # добро/за ремонт/износено
+    notes = db.Column(db.String(400), nullable=True)
+
+@app.route('/inventory', methods=['GET','POST'])
+@login_required
+@coach_permission_required('can_manage_inventory')
+def inventory():
+    if request.method == 'POST':
+        it = InventoryItem(
+            name=request.form.get('name'),
+            quantity=request.form.get('quantity', type=int) or 0,
+            location=request.form.get('location'),
+            condition=request.form.get('condition'),
+            notes=request.form.get('notes')
+        )
+        db.session.add(it); db.session.commit()
+        flash('Артикулът е добавен','success')
+        return redirect(url_for('inventory'))
+    items = InventoryItem.query.order_by(InventoryItem.name).all()
+    return render_template('inventory.html', items=items)
+
+@app.route('/inventory/<int:item_id>/delete', methods=['POST'])
+@login_required
+@coach_permission_required('can_manage_inventory')
+def inventory_delete(item_id):
+    InventoryItem.query.filter_by(id=item_id).delete(); db.session.commit()
+    flash('Артикулът е изтрит','success')
+    return redirect(url_for('inventory'))
+
+@app.route('/inventory/<int:item_id>/adjust', methods=['POST'])
+@login_required
+@coach_permission_required('can_manage_inventory')
+def inventory_adjust(item_id):
+    item = InventoryItem.query.get_or_404(item_id)
+    delta = request.form.get('delta', type=int)
+    item.quantity = max(0, (item.quantity or 0) + (delta or 0))
+    db.session.commit()
+    return redirect(url_for('inventory'))
 
 # CSV import
 def allowed_file(filename):

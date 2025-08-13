@@ -1,0 +1,64 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Треньори</h3>
+<div class="row">
+  <div class="col-md-6">
+    <div class="card mb-3"><div class="card-body">
+      <h5 class="card-title">Нов треньор</h5>
+      <form method="post" action="{{ url_for('admin_coaches') }}">
+        <div class="row g-2">
+          <div class="col-md-6"><input class="form-control" name="username" placeholder="Потребител" required></div>
+          <div class="col-md-6"><input class="form-control" name="password" type="password" placeholder="Парола" required></div>
+          <div class="col-md-6"><input class="form-control" name="full_name" placeholder="Име"></div>
+          <div class="col-md-6"><input class="form-control" name="phone" placeholder="Телефон"></div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Права</label>
+          <div class="row g-1">
+            <div class="col-6"><label class="form-check"><input class="form-check-input" type="checkbox" name="can_manage_players" checked> <span class="form-check-label">Играч/Отбори</span></label></div>
+            <div class="col-6"><label class="form-check"><input class="form-check-input" type="checkbox" name="can_manage_payments" checked> <span class="form-check-label">Плащания</span></label></div>
+            <div class="col-6"><label class="form-check"><input class="form-check-input" type="checkbox" name="can_mark_attendance" checked> <span class="form-check-label">Присъствие</span></label></div>
+            <div class="col-6"><label class="form-check"><input class="form-check-input" type="checkbox" name="can_manage_slots"> <span class="form-check-label">Слотове</span></label></div>
+            <div class="col-6"><label class="form-check"><input class="form-check-input" type="checkbox" name="can_manage_tournaments" checked> <span class="form-check-label">Турнири</span></label></div>
+            <div class="col-6"><label class="form-check"><input class="form-check-input" type="checkbox" name="can_manage_inventory" checked> <span class="form-check-label">Инвентар</span></label></div>
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Отбори</label>
+          <select class="form-select" name="team_ids" multiple size="6">
+            {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </select>
+          <small class="text-muted">Задръж Ctrl/Command за избор на няколко</small>
+        </div>
+        <button class="btn btn-success mt-2">Добави</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card mb-3"><div class="card-body">
+      <h5 class="card-title">Списък</h5>
+      <table class="table table-sm">
+        <thead><tr><th>Треньор</th><th>Потребител</th><th>Отбори</th><th></th></tr></thead>
+        <tbody>
+          {% for row in coach_rows %}
+          <tr>
+            <td>{{ row.user.username }}{% if row.coach.full_name %} ({{ row.coach.full_name }}){% endif %}</td>
+            <td>{{ row.user.role }}</td>
+            <td>{{ ', '.join(row.teams) }}</td>
+            <td>
+              <form method="post" action="{{ url_for('admin_coach_set_teams', coach_id=row.coach.id) }}">
+                <select class="form-select form-select-sm" name="team_ids" multiple size="4">
+                  {% for t in teams %}<option value="{{ t.id }}" {% if t.name in row.teams %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-primary btn-sm mt-1">Обнови</button>
+              </form>
+              <a class="btn btn-outline-secondary btn-sm mt-1" href="{{ url_for('coach_schedule', coach_id=row.coach.id) }}">График</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+
