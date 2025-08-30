@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Добави потребител</h3>
+<form method="post" class="row g-2">
+  <div class="col-md-4">
+    <label class="form-label">Потребителско име</label>
+    <input class="form-control" name="username" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Парола</label>
+    <input class="form-control" name="password" type="password" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Роля</label>
+    <select class="form-select" name="role">
+      <option value="trainer">trainer</option>
+      <option value="admin">admin</option>
+    </select>
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary mt-2">Създай</button>
+  </div>
+</form>
+{% endblock %}

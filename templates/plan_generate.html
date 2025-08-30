@@ -1,0 +1,31 @@
+{% extends 'base.html' %}{% block content %}
+<h3>Генерирай тренировки от план</h3>
+<div class="alert alert-info">
+  <div><strong>Отбор:</strong> {{ plan.plan_team.name if plan.plan_team else plan.team_id }}</div>
+  <div><strong>Ден:</strong> {{ ['Пон','Вт','Ср','Чет','Пет','Съб','Нед'][plan.weekday] }}</div>
+  <div><strong>Час:</strong> {{ plan.start_time }} - {{ plan.end_time }}</div>
+  <div><strong>Период на плана:</strong> {{ plan.start_date.strftime('%d.%m.%Y') }}{% if plan.end_date %} → {{ plan.end_date.strftime('%d.%m.%Y') }}{% endif %}</div>
+</div>
+
+<form method="post" class="row g-3">
+  <div class="col-md-4">
+    <label class="form-label">От дата</label>
+    <input class="form-control" type="date" name="gen_start" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">До дата</label>
+    <input class="form-control" type="date" name="gen_end" required>
+  </div>
+  <div class="col-md-12">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="includeExisting" name="include_existing" value="1">
+      <label class="form-check-label" for="includeExisting">Разреши дублиращи тренировки (иначе прескача съществуващите)</label>
+    </div>
+  </div>
+  <div class="col-md-12">
+    <button class="btn btn-primary" type="submit">Генерирай</button>
+    <a class="btn btn-secondary" href="{{ url_for('plans_list') }}">Назад</a>
+  </div>
+</form>
+{% endblock %}
+
