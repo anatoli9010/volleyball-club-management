@@ -1,30 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { loadExercises, type Exercise } from '../utils/csv'
-
-type ChildProfile = {
-  name: string
-  points: number
-  completed: Record<string, boolean>
-}
-
-const STORAGE_KEY = 'volleykids_profile'
-
-function useProfile(): [ChildProfile, (p: ChildProfile) => void] {
-  const [profile, setProfileState] = useState<ChildProfile>(() => {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : { name: 'Гост', points: 0, completed: {} }
-  })
-  const setProfile = (next: ChildProfile) => {
-    setProfileState(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-  }
-  return [profile, setProfile]
-}
+import { useProfiles } from '../context/ProfilesContext'
 
 export default function Child() {
   const [exercises, setExercises] = useState<Exercise[]>([])
-  const [profile, setProfile] = useProfile()
+  const { activeProfile, toggleMissionComplete } = useProfiles()
   const [query, setQuery] = useState('')
 
   useEffect(() => {
@@ -35,11 +16,19 @@ export default function Child() {
     return exercises.filter(e => (e.name + ' ' + e.description).toLowerCase().includes(query.toLowerCase()))
   }, [exercises, query])
 
-  const toggleComplete = (id: string) => {
-    const isDone = profile.completed[id]
-    const nextCompleted = { ...profile.completed, [id]: !isDone }
-    const delta = isDone ? -10 : 10
-    setProfile({ ...profile, completed: nextCompleted, points: Math.max(0, profile.points + delta) })
+  if (!activeProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
+        <div className="mx-auto max-w-2xl p-6 text-center">
+          <h1 className="text-2xl font-extrabold text-amber-600">Нямаш избран профил</h1>
+          <p className="mt-2 text-gray-600">Моля, създай или избери профил, за да започнеш мисиите.</p>
+          <div className="mt-6 flex justify-center gap-3">
+            <Link to="/profiles" className="btn btn-primary">Към профили</Link>
+            <Link to="/" className="btn">Начало</Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -48,7 +37,7 @@ export default function Child() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-amber-600">Мисии</h1>
-            <p className="text-sm text-gray-600">Точки: <span className="font-bold text-amber-700">{profile.points}</span></p>
+            <p className="text-sm text-gray-600">Точки: <span className="font-bold text-amber-700">{activeProfile.points}</span></p>
           </div>
           <Link to="/" className="text-sm text-gray-600 hover:text-primary">← Начало</Link>
         </div>
@@ -63,12 +52,12 @@ export default function Child() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((e) => {
             const id = e.name + '|' + (e.category || '')
-            const done = !!profile.completed[id]
+            const done = !!activeProfile.completed[id]
             return (
               <article key={id} className={`card ${done ? 'opacity-75' : ''}`}>
                 <div className="flex items-start justify-between">
                   <h3 className="text-lg font-bold">{e.name}</h3>
-                  <button className={`btn ${done ? 'bg-green-600 text-white' : 'btn-primary'}`} onClick={() => toggleComplete(id)}>
+                  <button className={`btn ${done ? 'bg-green-600 text-white' : 'btn-primary'}`} onClick={() => toggleMissionComplete(id)}>
                     {done ? 'Готово ✓' : '+10 точки'}
                   </button>
                 </div>

@@ -19,6 +19,12 @@ export default function Home() {
               <span className="mt-2 text-sm text-gray-500">Игрови мисии</span>
             </div>
           </Link>
+          <Link to="/profiles" className="card hover:shadow-md sm:col-span-2">
+            <div className="flex h-24 flex-col items-center justify-center">
+              <span className="text-lg font-semibold text-primary">Профили</span>
+              <span className="mt-1 text-xs text-gray-500">Създай/избери детски профили</span>
+            </div>
+          </Link>
         </div>
       </div>
     </div>
