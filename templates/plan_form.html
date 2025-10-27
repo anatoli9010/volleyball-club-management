@@ -1,0 +1,56 @@
+{% extends 'base.html' %}{% block content %}
+<h3>{{ 'Редакция на план' if plan else 'Нов тренировъчен план' }}</h3>
+<form method="post" class="mt-3">
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Отбор</label>
+      <select class="form-select" name="team_id" required>
+        <option value="">-- Изберете --</option>
+        {% for t in teams %}
+          <option value="{{ t.id }}" {% if plan and plan.team_id==t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Ден от седмицата</label>
+      <select class="form-select" name="weekday" required>
+        {% set days = ['Понеделник','Вторник','Сряда','Четвъртък','Петък','Събота','Неделя'] %}
+        {% for i in range(7) %}
+          <option value="{{ i }}" {% if plan and plan.weekday==i %}selected{% endif %}>{{ days[i] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Начало</label>
+      <input type="time" class="form-control" name="start_time" value="{{ plan.start_time if plan else '' }}" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Край</label>
+      <input type="time" class="form-control" name="end_time" value="{{ plan.end_time if plan else '' }}" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Начална дата</label>
+      <input type="date" class="form-control" name="start_date" value="{{ plan.start_date.isoformat() if plan else '' }}" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Крайна дата</label>
+      <input type="date" class="form-control" name="end_date" value="{{ plan.end_date.isoformat() if plan and plan.end_date else '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Бележки</label>
+      <input type="text" class="form-control" name="notes" value="{{ plan.notes if plan else '' }}" placeholder="Напр. Зала 2">
+    </div>
+    <div class="col-md-12">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="1" id="activeCheck" name="active" {% if not plan or plan.active %}checked{% endif %}>
+        <label class="form-check-label" for="activeCheck">Активен</label>
+      </div>
+    </div>
+  </div>
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-primary" type="submit">Запази</button>
+    <a class="btn btn-secondary" href="{{ url_for('plans_list') }}">Назад</a>
+  </div>
+</form>
+{% endblock %}
+

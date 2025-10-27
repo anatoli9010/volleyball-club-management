@@ -4,7 +4,7 @@ import re
 import time
 import threading
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 import logging
 
@@ -281,6 +281,18 @@ class Attendance(db.Model):
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False, default='absent')  # present/absent
     noted_at = db.Column(db.DateTime, nullable=True)
+
+# -------------------- Training Plans --------------------
+class TrainingPlan(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    weekday = db.Column(db.Integer, nullable=False)  # 0=Monday .. 6=Sunday
+    start_time = db.Column(db.String(20), nullable=False)
+    end_time = db.Column(db.String(20), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=True)
+    notes = db.Column(db.String(400), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
 
 # -------------------- Auth & Roles --------------------
 @login_manager.user_loader
@@ -1254,6 +1266,132 @@ def attendance_form(training_id):
     # add training_team for template
     training.session_team = Team.query.get(training.team_id) if training.team_id else None
     return render_template('attendance_form.html', training=training, players=players, attendance_map=attendance_map)
+
+# ---------- Training Plans CRUD & Generation ----------
+@app.route('/plans')
+@login_required
+def plans_list():
+    plans = TrainingPlan.query.order_by(TrainingPlan.team_id, TrainingPlan.weekday).all()
+    # attach team for display
+    for p in plans:
+        p.plan_team = Team.query.get(p.team_id)
+    return render_template('plans.html', plans=plans)
+
+@app.route('/plans/add', methods=['GET', 'POST'])
+@login_required
+def plan_add():
+    if request.method == 'POST':
+        try:
+            team_id = int(request.form.get('team_id'))
+            weekday = int(request.form.get('weekday'))
+            start_time = request.form.get('start_time')
+            end_time = request.form.get('end_time')
+            start_date = datetime.fromisoformat(request.form.get('start_date')).date()
+            end_date_str = request.form.get('end_date')
+            end_date = datetime.fromisoformat(end_date_str).date() if end_date_str else None
+            notes = request.form.get('notes') or ''
+            active = True if request.form.get('active') == '1' else False
+
+            plan = TrainingPlan(
+                team_id=team_id,
+                weekday=weekday,
+                start_time=start_time,
+                end_time=end_time,
+                start_date=start_date,
+                end_date=end_date,
+                notes=notes,
+                active=active
+            )
+            db.session.add(plan)
+            db.session.commit()
+            flash('Планът е добавен', 'success')
+            return redirect(url_for('plans_list'))
+        except Exception as e:
+            logger.exception('Add plan failed')
+            flash('Грешка при добавяне на план: ' + str(e), 'error')
+            return redirect(url_for('plan_add'))
+
+    teams = Team.query.order_by(Team.name).all()
+    return render_template('plan_form.html', teams=teams, plan=None)
+
+@app.route('/plans/<int:plan_id>/edit', methods=['GET','POST'])
+@login_required
+def plan_edit(plan_id):
+    plan = TrainingPlan.query.get_or_404(plan_id)
+    if request.method == 'POST':
+        plan.team_id = int(request.form.get('team_id'))
+        plan.weekday = int(request.form.get('weekday'))
+        plan.start_time = request.form.get('start_time')
+        plan.end_time = request.form.get('end_time')
+        plan.start_date = datetime.fromisoformat(request.form.get('start_date')).date()
+        end_date_str = request.form.get('end_date')
+        plan.end_date = datetime.fromisoformat(end_date_str).date() if end_date_str else None
+        plan.notes = request.form.get('notes') or ''
+        plan.active = True if request.form.get('active') == '1' else False
+        db.session.commit()
+        flash('Планът е обновен','success')
+        return redirect(url_for('plans_list'))
+    teams = Team.query.order_by(Team.name).all()
+    return render_template('plan_form.html', teams=teams, plan=plan)
+
+@app.route('/plans/<int:plan_id>/delete', methods=['POST'])
+@login_required
+def plan_delete(plan_id):
+    plan = TrainingPlan.query.get_or_404(plan_id)
+    db.session.delete(plan)
+    db.session.commit()
+    flash('Планът е изтрит','success')
+    return redirect(url_for('plans_list'))
+
+def daterange(start_date: date, end_date: date):
+    current = start_date
+    while current <= end_date:
+        yield current
+        current += timedelta(days=1)
+
+@app.route('/plans/<int:plan_id>/generate', methods=['GET','POST'])
+@login_required
+def plan_generate(plan_id):
+    plan = TrainingPlan.query.get_or_404(plan_id)
+    # attach team for display
+    plan.plan_team = Team.query.get(plan.team_id)
+    if request.method == 'POST':
+        try:
+            gen_start = datetime.fromisoformat(request.form.get('gen_start')).date()
+            gen_end = datetime.fromisoformat(request.form.get('gen_end')).date()
+            include_existing = request.form.get('include_existing') == '1'  # if True, keep duplicates
+
+            # Boundaries with plan start/end
+            start = max(gen_start, plan.start_date)
+            end = gen_end
+            if plan.end_date:
+                end = min(end, plan.end_date)
+
+            created = 0
+            for d in daterange(start, end):
+                if d.weekday() != plan.weekday:
+                    continue
+                # skip if session exists for same team/date unless include_existing
+                exists = TrainingSession.query.filter_by(team_id=plan.team_id, date=d).first()
+                if exists and not include_existing:
+                    continue
+                tr = TrainingSession(
+                    team_id=plan.team_id,
+                    date=d,
+                    start_time=plan.start_time,
+                    end_time=plan.end_time,
+                    notes=plan.notes
+                )
+                db.session.add(tr)
+                created += 1
+            db.session.commit()
+            flash(f'Генерирани тренировки: {created}', 'success')
+            return redirect(url_for('trainings'))
+        except Exception as e:
+            logger.exception('Generate from plan failed')
+            flash('Грешка при генериране: ' + str(e), 'error')
+            return redirect(url_for('plan_generate', plan_id=plan.id))
+    return render_template('plan_generate.html', plan=plan)
 
 # Attendance statistics
 @app.route('/attendance/stats/player/<int:player_id>')
